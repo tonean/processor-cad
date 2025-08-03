@@ -145,7 +145,10 @@ export function App() {
             touchAction: 'none',
             WebkitUserSelect: 'none',
             userSelect: 'none',
-            cursor: isDragging ? 'grabbing' : 'grab'
+            cursor: isDragging ? 'grabbing' : 'grab',
+            backfaceVisibility: 'hidden',
+            willChange: 'transform',
+            transformStyle: 'preserve-3d'
           }}
           onWheel={handleWheel}
           onMouseEnter={handleMouseEnter}
@@ -154,17 +157,20 @@ export function App() {
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
         >
-          {/* Dotted grid background with zoom applied */}
+          {/* Infinite dotted grid background with zoom applied */}
           <div 
-            className="absolute inset-0 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] dark:bg-[radial-gradient(#4a5568_1px,transparent_1px)] origin-center transition-colors duration-200" 
+            className="absolute bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] dark:bg-[radial-gradient(#4a5568_1px,transparent_1px)] origin-center transition-colors duration-200" 
             style={{
               backgroundSize: `${20 * zoom}px ${20 * zoom}px`,
               transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
               transformOrigin: 'center',
-              width: `${100 / zoom}%`,
-              height: `${100 / zoom}%`,
-              left: `${(1 - 1 / zoom) * 50}%`,
-              top: `${(1 - 1 / zoom) * 50}%`
+              width: `${2000 / zoom}%`,
+              height: `${2000 / zoom}%`,
+              left: `${-1000 / zoom}%`,
+              top: `${-1000 / zoom}%`,
+              backfaceVisibility: 'hidden',
+              willChange: 'transform',
+              transformStyle: 'preserve-3d'
             }}
           />
         </main>

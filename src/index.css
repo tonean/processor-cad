@@ -22,6 +22,11 @@ canvas-zoom-area {
   user-select: none;
   -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
+  backface-visibility: hidden;
+  will-change: transform;
+  transform-style: preserve-3d;
+  -webkit-backface-visibility: hidden;
+  -webkit-transform-style: preserve-3d;
 }
 
 /* Prevent zoom on the entire page when canvas is focused */
