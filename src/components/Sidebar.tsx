@@ -15,7 +15,7 @@ export const Sidebar = ({
           </button>
         </div>
         <div className="mb-4">
-          <button className="w-full text-left px-3 py-2 bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-200 rounded-md transition-colors duration-200 text-sm">
+          <button className="w-full text-left px-3 py-2 bg-blue-50 dark:bg-gray-700 text-blue-700 dark:text-gray-200 rounded-md transition-colors duration-200 text-sm">
             Page 1
           </button>
         </div>

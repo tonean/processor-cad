@@ -6,6 +6,7 @@ interface TopNavBarProps {
   onZoomIn: () => void;
   onZoomOut: () => void;
   onZoomReset: () => void;
+  onChatToggle: () => void;
   zoom: number;
   isDarkMode: boolean;
   toggleTheme: () => void;
@@ -14,6 +15,7 @@ export const TopNavBar = ({
   onZoomIn,
   onZoomOut,
   onZoomReset,
+  onChatToggle,
   zoom,
   isDarkMode,
   toggleTheme
@@ -62,10 +64,10 @@ export const TopNavBar = ({
         </button>
       </div>
       <div className="flex items-center space-x-3">
-        <div className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-md px-3 py-1 text-sm transition-colors duration-200">
+        <div className="bg-blue-100 dark:bg-gray-700 text-blue-800 dark:text-gray-200 rounded-md px-3 py-1 text-sm transition-colors duration-200">
           2 / 5
         </div>
-        <button className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-200">
+        <button className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-200" onClick={onChatToggle}>
           <MessageSquareIcon size={20} />
         </button>
         <div className="h-8 w-8 rounded-full overflow-hidden bg-gradient-to-br from-pink-400 to-purple-400">

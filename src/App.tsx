@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { TopNavBar } from './components/TopNavBar';
 import { Sidebar } from './components/Sidebar';
 import { BottomToolbar } from './components/BottomToolbar';
+import { RightSidebar } from './components/RightSidebar';
 
 export function App() {
   const [zoom, setZoom] = useState(1);
@@ -9,6 +10,7 @@ export function App() {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [isChatOpen, setIsChatOpen] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
   const [isDarkMode, setIsDarkMode] = useState(() => {
     // Check for saved theme preference or system preference
@@ -61,6 +63,10 @@ export function App() {
 
   const handlePanReset = () => {
     setPan({ x: 0, y: 0 });
+  };
+
+  const handleChatToggle = () => {
+    setIsChatOpen(!isChatOpen);
   };
 
   const handleWheel = (event: React.WheelEvent) => {
@@ -135,7 +141,7 @@ export function App() {
 
   return (
     <div className="flex flex-col h-screen w-full bg-white dark:bg-gray-900 overflow-hidden transition-colors duration-200">
-      <TopNavBar onZoomIn={handleZoomIn} onZoomOut={handleZoomOut} onZoomReset={handleZoomReset} zoom={zoom} isDarkMode={isDarkMode} toggleTheme={toggleTheme} />
+      <TopNavBar onZoomIn={handleZoomIn} onZoomOut={handleZoomOut} onZoomReset={handleZoomReset} zoom={zoom} isDarkMode={isDarkMode} toggleTheme={toggleTheme} onChatToggle={handleChatToggle} />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar isDarkMode={isDarkMode} />
         <main 
@@ -174,6 +180,7 @@ export function App() {
             }}
           />
         </main>
+        {isChatOpen && <RightSidebar isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} isDarkMode={isDarkMode} />}
       </div>
       <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2">
         <BottomToolbar isDarkMode={isDarkMode} />
