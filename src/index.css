@@ -14,3 +14,17 @@
   --background-start-rgb: 17, 24, 39;
   --background-end-rgb: 17, 24, 39;
 }
+
+/* Prevent browser pinch-to-zoom on canvas */
+canvas-zoom-area {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Prevent zoom on the entire page when canvas is focused */
+body.canvas-focused {
+  touch-action: none;
+}

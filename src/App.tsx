@@ -1,9 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { TopNavBar } from './components/TopNavBar';
 import { Sidebar } from './components/Sidebar';
 import { BottomToolbar } from './components/BottomToolbar';
+
 export function App() {
   const [zoom, setZoom] = useState(1);
+  const [isMouseOverCanvas, setIsMouseOverCanvas] = useState(false);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const canvasRef = useRef<HTMLDivElement>(null);
   const [isDarkMode, setIsDarkMode] = useState(() => {
     // Check for saved theme preference or system preference
     if (typeof window !== 'undefined') {
@@ -13,6 +19,7 @@ export function App() {
     }
     return false;
   });
+
   useEffect(() => {
     // Apply dark mode class to document
     if (isDarkMode) {
@@ -23,33 +30,143 @@ export function App() {
       localStorage.setItem('theme', 'light');
     }
   }, [isDarkMode]);
+
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    document.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => {
+      document.removeEventListener('mouseup', handleGlobalMouseUp);
+    };
+  }, []);
+
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
   };
+
   const handleZoomIn = () => {
     setZoom(prevZoom => Math.min(prevZoom + 0.1, 3));
   };
+
   const handleZoomOut = () => {
     setZoom(prevZoom => Math.max(prevZoom - 0.1, 0.5));
   };
+
   const handleZoomReset = () => {
     setZoom(1);
+    setPan({ x: 0, y: 0 });
   };
-  return <div className="flex flex-col h-screen w-full bg-white dark:bg-gray-900 overflow-hidden transition-colors duration-200">
+
+  const handlePanReset = () => {
+    setPan({ x: 0, y: 0 });
+  };
+
+  const handleWheel = (event: React.WheelEvent) => {
+    if (!isMouseOverCanvas) return;
+    
+    // Check if this is a pinch gesture (touchpad pinch)
+    if (event.deltaMode === 1) {
+      event.preventDefault();
+      
+      const delta = event.deltaY;
+      const zoomFactor = 0.1;
+      
+      if (delta > 0) {
+        // Zoom out
+        setZoom(prevZoom => Math.max(prevZoom - zoomFactor, 0.5));
+      } else {
+        // Zoom in
+        setZoom(prevZoom => Math.min(prevZoom + zoomFactor, 3));
+      }
+    }
+    // For regular mouse wheel, we can still allow it but with smaller increments
+    else if (Math.abs(event.deltaY) > 0) {
+      event.preventDefault();
+      
+      const delta = event.deltaY;
+      const zoomFactor = 0.05; // Smaller increment for mouse wheel
+      
+      if (delta > 0) {
+        // Zoom out
+        setZoom(prevZoom => Math.max(prevZoom - zoomFactor, 0.5));
+      } else {
+        // Zoom in
+        setZoom(prevZoom => Math.min(prevZoom + zoomFactor, 3));
+      }
+    }
+  };
+
+  const handleMouseEnter = () => {
+    setIsMouseOverCanvas(true);
+    document.body.classList.add('canvas-focused');
+  };
+
+  const handleMouseLeave = () => {
+    setIsMouseOverCanvas(false);
+    document.body.classList.remove('canvas-focused');
+    // Stop dragging if mouse leaves canvas
+    setIsDragging(false);
+  };
+
+  const handleMouseDown = (event: React.MouseEvent) => {
+    if (event.button === 0) { // Left mouse button only
+      setIsDragging(true);
+      setDragStart({
+        x: event.clientX - pan.x,
+        y: event.clientY - pan.y
+      });
+    }
+  };
+
+  const handleMouseMove = (event: React.MouseEvent) => {
+    if (isDragging) {
+      setPan({
+        x: event.clientX - dragStart.x,
+        y: event.clientY - dragStart.y
+      });
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  return (
+    <div className="flex flex-col h-screen w-full bg-white dark:bg-gray-900 overflow-hidden transition-colors duration-200">
       <TopNavBar onZoomIn={handleZoomIn} onZoomOut={handleZoomOut} onZoomReset={handleZoomReset} zoom={zoom} isDarkMode={isDarkMode} toggleTheme={toggleTheme} />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar isDarkMode={isDarkMode} />
-        <main className="flex-1 relative bg-white dark:bg-gray-900 overflow-hidden transition-colors duration-200">
+        <main 
+          ref={canvasRef}
+          className="flex-1 relative bg-white dark:bg-gray-900 overflow-hidden transition-colors duration-200 canvas-zoom-area"
+          style={{
+            touchAction: 'none',
+            WebkitUserSelect: 'none',
+            userSelect: 'none',
+            cursor: isDragging ? 'grabbing' : 'grab'
+          }}
+          onWheel={handleWheel}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+        >
           {/* Dotted grid background with zoom applied */}
-          <div className="absolute inset-0 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] dark:bg-[radial-gradient(#4a5568_1px,transparent_1px)] origin-center transition-colors duration-200" style={{
-          backgroundSize: `${20 * zoom}px ${20 * zoom}px`,
-          transform: `scale(${zoom})`,
-          transformOrigin: 'center',
-          width: `${100 / zoom}%`,
-          height: `${100 / zoom}%`,
-          left: `${(1 - 1 / zoom) * 50}%`,
-          top: `${(1 - 1 / zoom) * 50}%`
-        }}></div>
+          <div 
+            className="absolute inset-0 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] dark:bg-[radial-gradient(#4a5568_1px,transparent_1px)] origin-center transition-colors duration-200" 
+            style={{
+              backgroundSize: `${20 * zoom}px ${20 * zoom}px`,
+              transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
+              transformOrigin: 'center',
+              width: `${100 / zoom}%`,
+              height: `${100 / zoom}%`,
+              left: `${(1 - 1 / zoom) * 50}%`,
+              top: `${(1 - 1 / zoom) * 50}%`
+            }}
+          />
         </main>
       </div>
       <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2">
@@ -60,5 +177,6 @@ export function App() {
           ?
         </button>
       </div>
-    </div>;
+    </div>
+  );
 }
