@@ -3,6 +3,7 @@ import { TopNavBar } from './components/TopNavBar';
 import { Sidebar } from './components/Sidebar';
 import { BottomToolbar } from './components/BottomToolbar';
 import { RightSidebar } from './components/RightSidebar';
+import { DraggableModal } from './components/DraggableModal';
 
 export function App() {
   const [zoom, setZoom] = useState(1);
@@ -24,6 +25,10 @@ export function App() {
     isDragging: boolean;
     dragStart: { x: number; y: number };
   }>>([]);
+  
+  // Modal state
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalPosition, setModalPosition] = useState({ x: 100, y: 100 });
   
   // Undo/Redo state
   const [history, setHistory] = useState<Array<{
@@ -105,6 +110,25 @@ export function App() {
 
   const handleRightSidebarCollapse = () => {
     setIsChatOpen(false);
+  };
+
+  const handleOpenModal = () => {
+    // Only set initial position if modal is not already open
+    if (!isModalOpen) {
+      // Position modal in a good initial location on the canvas
+      const initialX = -pan.x / zoom + 100;
+      const initialY = -pan.y / zoom + 100;
+      setModalPosition({ x: initialX, y: initialY });
+    }
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+  };
+
+  const handleModalDrag = (newPosition: { x: number; y: number }) => {
+    setModalPosition(newPosition);
   };
 
   const saveToHistory = (newImages: typeof images) => {
@@ -403,6 +427,30 @@ export function App() {
               />
             </div>
           ))}
+          
+          {/* Modal on canvas */}
+          {isModalOpen && (
+            <div
+              className="absolute"
+              style={{
+                left: `${modalPosition.x * zoom + pan.x}px`,
+                top: `${modalPosition.y * zoom + pan.y}px`,
+                transform: `scale(${zoom})`,
+                transformOrigin: 'top left',
+                zIndex: 2000
+              }}
+            >
+              <DraggableModal
+                isOpen={isModalOpen}
+                onClose={handleCloseModal}
+                isDarkMode={isDarkMode}
+                modalPosition={modalPosition}
+                onDrag={handleModalDrag}
+                canvasZoom={zoom}
+                canvasPan={pan}
+              />
+            </div>
+          )}
         </main>
         {isChatOpen && (
           <RightSidebar 
@@ -416,7 +464,7 @@ export function App() {
         )}
       </div>
       <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2">
-        <BottomToolbar isDarkMode={isDarkMode} />
+        <BottomToolbar isDarkMode={isDarkMode} onOpenModal={handleOpenModal} />
       </div>
       <div className="absolute bottom-6 right-6 z-10">
         <button className="w-8 h-8 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center text-gray-500 dark:text-gray-400 transition-colors duration-200">

@@ -100,12 +100,12 @@ export const TopNavBar = ({
               onChange={handleTextChange}
               onBlur={handleTextBlur}
               onKeyDown={handleTextKeyDown}
-              className="text-xs font-medium bg-transparent border-none outline-none text-gray-800 dark:text-gray-200 min-w-0 w-auto max-w-32"
+              className="text-sm font-medium bg-transparent border-none outline-none text-gray-800 dark:text-gray-200 min-w-0 w-auto max-w-32"
               autoFocus
             />
           ) : (
             <span 
-              className="text-xs font-medium cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200"
+              className="text-sm font-medium cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200"
               onClick={handleTextClick}
               title="Click to edit"
             >
