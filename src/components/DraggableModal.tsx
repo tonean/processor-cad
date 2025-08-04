@@ -27,45 +27,60 @@ export const DraggableModal: React.FC<DraggableModalProps> = ({
   const modalRef = useRef<HTMLDivElement>(null);
 
   const handleMouseDown = (e: React.MouseEvent) => {
+    console.log('Modal mouse down - starting drag');
     e.stopPropagation(); // Prevent canvas dragging
     
-    if (isDragging) {
-      // If already dragging, stop dragging
-      setIsDragging(false);
-    } else {
-      // Start dragging
-      const currentScreenX = modalPosition.x * canvasZoom + canvasPan.x;
-      const currentScreenY = modalPosition.y * canvasZoom + canvasPan.y;
-      
-      // Calculate offset from mouse to modal's top-left corner in canvas coordinates
-      const offsetX = (e.clientX - currentScreenX) / canvasZoom;
-      const offsetY = (e.clientY - currentScreenY) / canvasZoom;
-      
-      setDragOffset({ x: offsetX, y: offsetY });
-      setIsDragging(true);
-    }
+    const currentScreenX = modalPosition.x * canvasZoom + canvasPan.x;
+    const currentScreenY = modalPosition.y * canvasZoom + canvasPan.y;
+    
+    // Calculate offset from mouse to modal's top-left corner in canvas coordinates
+    const offsetX = (e.clientX - currentScreenX) / canvasZoom;
+    const offsetY = (e.clientY - currentScreenY) / canvasZoom;
+    
+    console.log('Drag offset calculated:', { offsetX, offsetY });
+    setDragOffset({ x: offsetX, y: offsetY });
+    setIsDragging(true);
+    console.log('isDragging set to true');
   };
 
   const handleMouseMove = (e: MouseEvent) => {
     if (isDragging && onDrag) {
+      console.log('Mouse move while dragging');
       // Convert mouse position to canvas coordinates, accounting for the drag offset
       const canvasX = (e.clientX - canvasPan.x) / canvasZoom - dragOffset.x;
       const canvasY = (e.clientY - canvasPan.y) / canvasZoom - dragOffset.y;
       
+      console.log('New canvas position:', { canvasX, canvasY });
       onDrag({ x: canvasX, y: canvasY });
     }
   };
 
-  // Mouse move listener for the entire document when dragging
+  const handleMouseUp = (e: MouseEvent) => {
+    console.log('Mouse up detected - stopping drag');
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    console.log('isDragging set to false');
+  };
+
+  // Mouse move and up listeners for the entire document when dragging
   useEffect(() => {
+    console.log('useEffect triggered, isDragging:', isDragging);
     if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove);
+      console.log('Setting up global mouse listeners');
+      const handleGlobalMouseMove = (e: MouseEvent) => handleMouseMove(e);
+      const handleGlobalMouseUp = (e: MouseEvent) => handleMouseUp(e);
+      
+      document.addEventListener('mousemove', handleGlobalMouseMove);
+      document.addEventListener('mouseup', handleGlobalMouseUp);
       
       return () => {
-        document.removeEventListener('mousemove', handleMouseMove);
+        console.log('Cleaning up global mouse listeners');
+        document.removeEventListener('mousemove', handleGlobalMouseMove);
+        document.removeEventListener('mouseup', handleGlobalMouseUp);
       };
     }
-  }, [isDragging, dragOffset, canvasZoom, canvasPan, onDrag]);
+  }, [isDragging]); // Only depend on isDragging, not the other values that change during drag
 
   if (!isOpen) return null;
 
@@ -85,7 +100,7 @@ export const DraggableModal: React.FC<DraggableModalProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
         <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
-          Add New {isDragging && <span className="text-blue-500 text-sm ml-2">(Dragging - click to release)</span>}
+          Add New
         </h3>
         <button
           onClick={(e) => {
@@ -102,12 +117,7 @@ export const DraggableModal: React.FC<DraggableModalProps> = ({
       <div className="p-4">
         <div className="text-gray-500 dark:text-gray-400 text-center py-8">
           <p>Modal content goes here</p>
-          <p className="text-sm mt-2">
-            {isDragging 
-              ? "Move your mouse to drag, then click to stop" 
-              : "Click anywhere on this modal to start dragging"
-            }
-          </p>
+          <p className="text-sm mt-2">This modal is draggable on the canvas</p>
         </div>
       </div>
     </div>
