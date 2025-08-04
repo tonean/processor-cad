@@ -6,7 +6,7 @@ import { RightSidebar } from './components/RightSidebar';
 import { DraggableModal } from './components/DraggableModal';
 
 export function App() {
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(0.8);
   const [isMouseOverCanvas, setIsMouseOverCanvas] = useState(false);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -24,11 +24,30 @@ export function App() {
     height: number;
     isDragging: boolean;
     dragStart: { x: number; y: number };
+    isSelected: boolean;
+    isResizing: boolean;
+    resizeStart: { x: number; y: number; width: number; height: number };
   }>>([]);
   
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalPosition, setModalPosition] = useState({ x: 100, y: 100 });
+  
+  // Edge/Connection state
+  const [edges, setEdges] = useState<Array<{
+    id: string;
+    sourcePort: string;
+    targetPort: string;
+    sourceNode: string;
+    targetNode: string;
+    startX: number;
+    startY: number;
+    endX: number;
+    endY: number;
+  }>>([]);
+  const [isCreatingEdge, setIsCreatingEdge] = useState(false);
+  const [edgeStart, setEdgeStart] = useState<{ portId: string; position: { x: number; y: number } } | null>(null);
+  const [currentEdgeEnd, setCurrentEdgeEnd] = useState({ x: 0, y: 0 });
   
   // Undo/Redo state
   const [history, setHistory] = useState<Array<{
@@ -115,9 +134,9 @@ export function App() {
   const handleOpenModal = () => {
     // Only set initial position if modal is not already open
     if (!isModalOpen) {
-      // Position modal in a good initial location on the canvas
-      const initialX = -pan.x / zoom + 100;
-      const initialY = -pan.y / zoom + 100;
+      // Position modal more to the right and down on the canvas
+      const initialX = -pan.x / zoom + 220; // More to the right (was 100)
+      const initialY = -pan.y / zoom + 170; // More down (was 100)
       setModalPosition({ x: initialX, y: initialY });
     }
     setIsModalOpen(true);
@@ -129,6 +148,40 @@ export function App() {
 
   const handleModalDrag = (newPosition: { x: number; y: number }) => {
     setModalPosition(newPosition);
+  };
+
+  const handlePortDrag = (portId: string, startPosition: { x: number; y: number }) => {
+    console.log('Port drag started:', portId, startPosition);
+    setIsCreatingEdge(true);
+    setEdgeStart({ portId, position: startPosition });
+    setCurrentEdgeEnd(startPosition);
+  };
+
+  const handleCanvasMouseMove = (e: React.MouseEvent) => {
+    if (isCreatingEdge) {
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (rect) {
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        
+        // Convert screen coordinates to canvas coordinates
+        const canvasX = (mouseX - pan.x) / zoom;
+        const canvasY = (mouseY - pan.y) / zoom;
+        
+        setCurrentEdgeEnd({ x: canvasX, y: canvasY });
+      }
+    }
+  };
+
+  const handleCanvasMouseUp = () => {
+    if (isCreatingEdge && edgeStart) {
+      console.log('Edge creation finished');
+      
+      // Don't create permanent edges - just clear the dragging state
+      setIsCreatingEdge(false);
+      setEdgeStart(null);
+      setCurrentEdgeEnd({ x: 0, y: 0 });
+    }
   };
 
   const saveToHistory = (newImages: typeof images) => {
@@ -195,7 +248,10 @@ export function App() {
               width: img.width,
               height: img.height,
               isDragging: false,
-              dragStart: { x: 0, y: 0 }
+              dragStart: { x: 0, y: 0 },
+              isSelected: false,
+              isResizing: false,
+              resizeStart: { x: 0, y: 0, width: 0, height: 0 }
             };
             
             setImages(prev => {
@@ -258,6 +314,9 @@ export function App() {
   const handleMouseEnter = () => {
     setIsMouseOverCanvas(true);
     document.body.classList.add('canvas-focused');
+    // Prevent browser zoom when over canvas
+    document.body.style.zoom = '1';
+    document.body.style.transform = 'scale(1)';
   };
 
   const handleMouseLeave = () => {
@@ -286,15 +345,39 @@ export function App() {
             const mouseX = event.clientX - rect.left;
             const mouseY = event.clientY - rect.top;
             
+            // Check if clicking on resize handle
+            const isResizeHandle = target.closest('[data-resize-handle]');
+            if (isResizeHandle) {
+              setImages(prev => prev.map(img => 
+                img.id === imageId 
+                  ? { 
+                      ...img, 
+                      isResizing: true, 
+                      resizeStart: { 
+                        x: mouseX, 
+                        y: mouseY, 
+                        width: img.width, 
+                        height: img.height 
+                      }
+                    }
+                  : { ...img, isSelected: false }
+              ));
+              return;
+            }
+            
+            // Regular image selection and dragging
             setImages(prev => prev.map(img => 
               img.id === imageId 
-                ? { ...img, isDragging: true, dragStart: { x: mouseX - img.x * zoom, y: mouseY - img.y * zoom } }
-                : img
+                ? { ...img, isDragging: true, isSelected: true, dragStart: { x: mouseX - img.x * zoom, y: mouseY - img.y * zoom } }
+                : { ...img, isSelected: false }
             ));
             return; // Don't start canvas dragging
           }
         }
       }
+      
+      // Deselect all images if clicking on canvas
+      setImages(prev => prev.map(img => ({ ...img, isSelected: false })));
       
       setIsDragging(true);
       setDragStart({
@@ -331,13 +414,45 @@ export function App() {
         ));
       }
     }
+
+    // Handle image resizing
+    const resizingImage = images.find(img => img.isResizing);
+    if (resizingImage) {
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (rect) {
+        const mouseX = event.clientX - rect.left;
+        const mouseY = event.clientY - rect.top;
+        
+        const deltaX = mouseX - resizingImage.resizeStart.x;
+        const deltaY = mouseY - resizingImage.resizeStart.y;
+        
+        // Much more gradual scaling for smoother resizing
+        const scaleFactor = Math.max(0.1, 1 + (deltaX + deltaY) / 500);
+        
+        setImages(prev => prev.map(img => 
+          img.isResizing 
+            ? { 
+                ...img, 
+                width: resizingImage.resizeStart.width * scaleFactor,
+                height: resizingImage.resizeStart.height * scaleFactor
+              }
+            : img
+        ));
+      }
+    }
+
+    // Handle edge creation
+    handleCanvasMouseMove(event);
   };
 
   const handleMouseUp = () => {
     setIsDragging(false);
     
     // Stop image dragging
-    setImages(prev => prev.map(img => ({ ...img, isDragging: false })));
+    setImages(prev => prev.map(img => ({ ...img, isDragging: false, isResizing: false })));
+
+    // Handle edge creation
+    handleCanvasMouseUp();
   };
 
   return (
@@ -427,9 +542,22 @@ export function App() {
               <img
                 src={image.src}
                 alt="Dropped image"
-                className="w-full h-full object-contain pointer-events-none"
+                className={`w-full h-full object-contain pointer-events-none ${
+                  image.isSelected ? 'outline outline-2 outline-blue-500 outline-offset-2' : ''
+                }`}
                 draggable={false}
               />
+              
+              {/* Resize handle */}
+              {image.isSelected && (
+                <div
+                  data-resize-handle
+                  className="absolute bottom-0 right-0 w-4 h-4 bg-blue-500 rounded-full cursor-se-resize border-2 border-white"
+                  style={{
+                    transform: 'translate(50%, 50%)'
+                  }}
+                />
+              )}
             </div>
           ))}
           
@@ -453,9 +581,107 @@ export function App() {
                 onDrag={handleModalDrag}
                 canvasZoom={zoom}
                 canvasPan={pan}
+                onPortDrag={handlePortDrag}
               />
             </div>
           )}
+
+          {/* Edges/Connections */}
+          <svg
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              width: '100%',
+              height: '100%',
+              zIndex: 2500
+            }}
+          >
+            {/* Render existing edges */}
+            {edges.map(edge => (
+              <g key={edge.id}>
+                <line
+                  x1={edge.startX * zoom + pan.x}
+                  y1={edge.startY * zoom + pan.y}
+                  x2={edge.endX * zoom + pan.x}
+                  y2={edge.endY * zoom + pan.y}
+                  stroke="#6b7280"
+                  strokeWidth="2"
+                  fill="none"
+                  markerEnd="url(#arrowhead)"
+                />
+                {/* Add a subtle shadow/glow effect */}
+                <line
+                  x1={edge.startX * zoom + pan.x}
+                  y1={edge.startY * zoom + pan.y}
+                  x2={edge.endX * zoom + pan.x}
+                  y2={edge.endY * zoom + pan.y}
+                  stroke="#3b82f6"
+                  strokeWidth="1"
+                  fill="none"
+                  opacity="0.6"
+                />
+              </g>
+            ))}
+            
+            {/* Render edge being created */}
+            {isCreatingEdge && edgeStart && (
+              <g>
+                <line
+                  x1={edgeStart.position.x * zoom + pan.x}
+                  y1={edgeStart.position.y * zoom + pan.y}
+                  x2={currentEdgeEnd.x * zoom + pan.x}
+                  y2={currentEdgeEnd.y * zoom + pan.y}
+                  stroke="#ef4444"
+                  strokeWidth="3"
+                  strokeDasharray="5,5"
+                  fill="none"
+                  markerEnd="url(#arrowhead-red)"
+                />
+                {/* Add a subtle shadow/glow effect for the creating edge */}
+                <line
+                  x1={edgeStart.position.x * zoom + pan.x}
+                  y1={edgeStart.position.y * zoom + pan.y}
+                  x2={currentEdgeEnd.x * zoom + pan.x}
+                  y2={currentEdgeEnd.y * zoom + pan.y}
+                  stroke="#fca5a5"
+                  strokeWidth="2"
+                  fill="none"
+                  opacity="0.8"
+                />
+              </g>
+            )}
+            
+            {/* Arrow marker definitions */}
+            <defs>
+              <marker
+                id="arrowhead"
+                markerWidth="10"
+                markerHeight="7"
+                refX="9"
+                refY="3.5"
+                orient="auto"
+                markerUnits="strokeWidth"
+              >
+                <polygon
+                  points="0 0, 10 3.5, 0 7"
+                  fill="#6b7280"
+                />
+              </marker>
+              <marker
+                id="arrowhead-red"
+                markerWidth="12"
+                markerHeight="8"
+                refX="10"
+                refY="4"
+                orient="auto"
+                markerUnits="strokeWidth"
+              >
+                <polygon
+                  points="0 0, 12 4, 0 8"
+                  fill="#ef4444"
+                />
+              </marker>
+            </defs>
+          </svg>
         </main>
         {isChatOpen && (
           <RightSidebar 

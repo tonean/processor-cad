@@ -74,7 +74,7 @@ export const Sidebar = ({
     >
       <div className="p-3 flex-1">
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-sm font-medium">Folders</h2>
+          <h2 className="text-sm font-medium">Simulations</h2>
           <button className="w-6 h-6 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors duration-200">
             <PlusIcon size={16} />
           </button>

@@ -32,10 +32,54 @@ canvas-zoom-area {
 /* Prevent zoom on the entire page when canvas is focused */
 body.canvas-focused {
   touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  /* Prevent browser zoom */
+  zoom: 1 !important;
+  -ms-zoom: 1 !important;
+  -webkit-zoom: 1 !important;
+  transform: scale(1) !important;
+  -webkit-transform: scale(1) !important;
+  -moz-transform: scale(1) !important;
+  -ms-transform: scale(1) !important;
+}
+
+/* Prevent zoom on canvas area specifically */
+.canvas-zoom-area {
+  touch-action: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  -webkit-touch-callout: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+  backface-visibility: hidden !important;
+  will-change: transform !important;
+  transform-style: preserve-3d !important;
+  -webkit-backface-visibility: hidden !important;
+  -webkit-transform-style: preserve-3d !important;
+  /* Prevent browser zoom */
+  zoom: 1 !important;
+  -ms-zoom: 1 !important;
+  -webkit-zoom: 1 !important;
+  transform: scale(1) !important;
+  -webkit-transform: scale(1) !important;
+  -moz-transform: scale(1) !important;
+  -ms-transform: scale(1) !important;
 }
 
 /* Prevent text selection during drag operations */
 .dragging {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Prevent text selection and blue highlighting globally */
+* {
   -webkit-user-select: none;
   -moz-user-select: none;
   -ms-user-select: none;
