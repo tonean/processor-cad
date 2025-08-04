@@ -48,3 +48,31 @@ body.canvas-focused {
 * {
   -webkit-tap-highlight-color: transparent;
 }
+
+/* Gradient animation for input focus */
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* Enhanced gradient animation for input focus */
+.input-gradient-focus {
+  background: linear-gradient(white, white) padding-box, 
+              linear-gradient(45deg, #ff6b6b, #feca57, #48dbfb, #ff9ff3, #54a0ff, #5f27cd) border-box !important;
+  border: 2px solid transparent !important;
+  background-size: 400% 400% !important;
+  animation: gradientShift 3s ease infinite !important;
+}
+
+/* Dark mode support for gradient input */
+.dark .input-gradient-focus {
+  background: linear-gradient(#1f2937, #1f2937) padding-box, 
+              linear-gradient(45deg, #ff6b6b, #feca57, #48dbfb, #ff9ff3, #54a0ff, #5f27cd) border-box !important;
+}

@@ -108,7 +108,21 @@ export const RightSidebar = ({
           <input
             type="text"
             placeholder="Type / to see commands"
-            className="w-full px-4 py-3 pr-12 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors duration-200"
+            className="w-full px-4 py-3 pr-12 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:border-transparent transition-all duration-300"
+            onFocus={(e) => {
+              const isDark = document.documentElement.classList.contains('dark');
+              const bgColor = isDark ? '#1f2937' : 'white';
+              e.target.style.background = `linear-gradient(${bgColor}, ${bgColor}) padding-box, linear-gradient(45deg, #ff6b6b, #feca57, #48dbfb, #ff9ff3, #54a0ff, #5f27cd) border-box`;
+              e.target.style.border = '2px solid transparent';
+              e.target.style.backgroundSize = '400% 400%';
+              e.target.style.animation = 'gradientShift 3s ease infinite';
+            }}
+            onBlur={(e) => {
+              e.target.style.background = '';
+              e.target.style.border = '';
+              e.target.style.backgroundSize = '';
+              e.target.style.animation = '';
+            }}
           />
           <button className="absolute right-3 top-1/2 transform -translate-y-1/2 w-6 h-6 flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-200">
             <ArrowUpIcon size={16} />

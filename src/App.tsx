@@ -14,6 +14,23 @@ export function App() {
   const [leftSidebarWidth, setLeftSidebarWidth] = useState(256);
   const [rightSidebarWidth, setRightSidebarWidth] = useState(256);
   const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] = useState(false);
+  const [images, setImages] = useState<Array<{
+    id: string;
+    src: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    isDragging: boolean;
+    dragStart: { x: number; y: number };
+  }>>([]);
+  
+  // Undo/Redo state
+  const [history, setHistory] = useState<Array<{
+    images: typeof images;
+  }>>([{ images: [] }]);
+  const [historyIndex, setHistoryIndex] = useState(0);
+  
   const canvasRef = useRef<HTMLDivElement>(null);
   const [isDarkMode, setIsDarkMode] = useState(() => {
     // Check for saved theme preference or system preference
@@ -52,11 +69,13 @@ export function App() {
   };
 
   const handleZoomIn = () => {
-    setZoom(prevZoom => Math.min(prevZoom + 0.1, 3));
+    const newZoom = Math.min(zoom + 0.1, 3);
+    setZoom(newZoom);
   };
 
   const handleZoomOut = () => {
-    setZoom(prevZoom => Math.max(prevZoom - 0.1, 0.5));
+    const newZoom = Math.max(zoom - 0.1, 0.5);
+    setZoom(newZoom);
   };
 
   const handleZoomReset = () => {
@@ -88,6 +107,86 @@ export function App() {
     setIsChatOpen(false);
   };
 
+  const saveToHistory = (newImages: typeof images) => {
+    setHistory(prev => {
+      const newHistory = prev.slice(0, historyIndex + 1);
+      newHistory.push({ images: newImages });
+      // Limit history to 50 states to prevent memory issues
+      if (newHistory.length > 50) {
+        newHistory.shift();
+      }
+      return newHistory;
+    });
+    setHistoryIndex(prev => prev + 1);
+  };
+
+  const handleUndo = () => {
+    if (historyIndex > 0) {
+      const newIndex = historyIndex - 1;
+      const state = history[newIndex];
+      setImages(state.images);
+      setHistoryIndex(newIndex);
+    }
+  };
+
+  const handleRedo = () => {
+    if (historyIndex < history.length - 1) {
+      const newIndex = historyIndex + 1;
+      const state = history[newIndex];
+      setImages(state.images);
+      setHistoryIndex(newIndex);
+    }
+  };
+
+  const handleDragOver = (event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+  };
+
+  const handleDrop = (event: React.DragEvent) => {
+    event.preventDefault();
+    
+    const files = Array.from(event.dataTransfer.files);
+    const imageFiles = files.filter(file => file.type.startsWith('image/'));
+    
+    imageFiles.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const rect = canvasRef.current?.getBoundingClientRect();
+          if (rect) {
+            const dropX = event.clientX - rect.left;
+            const dropY = event.clientY - rect.top;
+            
+            // Convert screen coordinates to canvas coordinates
+            const canvasX = (dropX - pan.x) / zoom;
+            const canvasY = (dropY - pan.y) / zoom;
+            
+            const newImage = {
+              id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+              src: e.target?.result as string,
+              x: canvasX,
+              y: canvasY,
+              width: img.width,
+              height: img.height,
+              isDragging: false,
+              dragStart: { x: 0, y: 0 }
+            };
+            
+            setImages(prev => {
+              const newImages = [...prev, newImage];
+              saveToHistory(newImages);
+              return newImages;
+            });
+          }
+        };
+        img.src = e.target?.result as string;
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleWheel = (event: React.WheelEvent) => {
     if (!isMouseOverCanvas) return;
     
@@ -100,10 +199,12 @@ export function App() {
       
       if (delta > 0) {
         // Zoom out
-        setZoom(prevZoom => Math.max(prevZoom - zoomFactor, 0.5));
+        const newZoom = Math.max(zoom - zoomFactor, 0.5);
+        setZoom(newZoom);
       } else {
         // Zoom in
-        setZoom(prevZoom => Math.min(prevZoom + zoomFactor, 3));
+        const newZoom = Math.min(zoom + zoomFactor, 3);
+        setZoom(newZoom);
       }
     }
     // For regular mouse wheel, we can still allow it but with smaller increments
@@ -115,10 +216,12 @@ export function App() {
       
       if (delta > 0) {
         // Zoom out
-        setZoom(prevZoom => Math.max(prevZoom - zoomFactor, 0.5));
+        const newZoom = Math.max(zoom - zoomFactor, 0.5);
+        setZoom(newZoom);
       } else {
         // Zoom in
-        setZoom(prevZoom => Math.min(prevZoom + zoomFactor, 3));
+        const newZoom = Math.min(zoom + zoomFactor, 3);
+        setZoom(newZoom);
       }
     }
   };
@@ -143,6 +246,27 @@ export function App() {
         return; // Don't start canvas dragging if over sidebar
       }
       
+      // Check if clicking on an image
+      const imageElement = target.closest('[data-image-id]');
+      if (imageElement) {
+        const imageId = imageElement.getAttribute('data-image-id');
+        const image = images.find(img => img.id === imageId);
+        if (image) {
+          const rect = canvasRef.current?.getBoundingClientRect();
+          if (rect) {
+            const mouseX = event.clientX - rect.left;
+            const mouseY = event.clientY - rect.top;
+            
+            setImages(prev => prev.map(img => 
+              img.id === imageId 
+                ? { ...img, isDragging: true, dragStart: { x: mouseX - img.x * zoom, y: mouseY - img.y * zoom } }
+                : img
+            ));
+            return; // Don't start canvas dragging
+          }
+        }
+      }
+      
       setIsDragging(true);
       setDragStart({
         x: event.clientX - pan.x,
@@ -158,15 +282,48 @@ export function App() {
         y: event.clientY - dragStart.y
       });
     }
+    
+    // Handle image dragging
+    const draggingImage = images.find(img => img.isDragging);
+    if (draggingImage) {
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (rect) {
+        const mouseX = event.clientX - rect.left;
+        const mouseY = event.clientY - rect.top;
+        
+        setImages(prev => prev.map(img => 
+          img.isDragging 
+            ? { 
+                ...img, 
+                x: (mouseX - img.dragStart.x) / zoom,
+                y: (mouseY - img.dragStart.y) / zoom
+              }
+            : img
+        ));
+      }
+    }
   };
 
   const handleMouseUp = () => {
     setIsDragging(false);
+    
+    // Stop image dragging
+    setImages(prev => prev.map(img => ({ ...img, isDragging: false })));
   };
 
   return (
     <div className="flex flex-col h-screen w-full bg-white dark:bg-gray-900 overflow-hidden transition-colors duration-200">
-      <TopNavBar onZoomIn={handleZoomIn} onZoomOut={handleZoomOut} onZoomReset={handleZoomReset} zoom={zoom} isDarkMode={isDarkMode} toggleTheme={toggleTheme} onChatToggle={handleChatToggle} />
+      <TopNavBar 
+        onZoomIn={handleZoomIn} 
+        onZoomOut={handleZoomOut} 
+        onZoomReset={handleZoomReset} 
+        zoom={zoom} 
+        isDarkMode={isDarkMode} 
+        toggleTheme={toggleTheme} 
+        onChatToggle={handleChatToggle}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
+      />
       <div className="flex flex-1 overflow-hidden">
         {!isLeftSidebarCollapsed && (
           <Sidebar 
@@ -202,6 +359,8 @@ export function App() {
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
         >
           {/* Infinite dotted grid background with zoom applied */}
           <div 
@@ -219,6 +378,31 @@ export function App() {
               transformStyle: 'preserve-3d'
             }}
           />
+          
+          {/* Images on canvas */}
+          {images.map(image => (
+            <div
+              key={image.id}
+              data-image-id={image.id}
+              className="absolute cursor-move select-none"
+              style={{
+                left: `${image.x * zoom + pan.x}px`,
+                top: `${image.y * zoom + pan.y}px`,
+                width: `${image.width * zoom}px`,
+                height: `${image.height * zoom}px`,
+                transform: `scale(${zoom})`,
+                transformOrigin: 'top left',
+                zIndex: image.isDragging ? 1000 : 100
+              }}
+            >
+              <img
+                src={image.src}
+                alt="Dropped image"
+                className="w-full h-full object-contain pointer-events-none"
+                draggable={false}
+              />
+            </div>
+          ))}
         </main>
         {isChatOpen && (
           <RightSidebar 

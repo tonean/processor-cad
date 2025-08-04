@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Logo } from './Logo';
 import { ThemeToggle } from './ThemeToggle';
 import { Undo2Icon, Redo2Icon, PlusIcon, MinusIcon, MaximizeIcon, SplitIcon, ChevronDownIcon, MessageSquareIcon } from 'lucide-react';
@@ -7,6 +7,8 @@ interface TopNavBarProps {
   onZoomOut: () => void;
   onZoomReset: () => void;
   onChatToggle: () => void;
+  onUndo: () => void;
+  onRedo: () => void;
   zoom: number;
   isDarkMode: boolean;
   toggleTheme: () => void;
@@ -16,12 +18,44 @@ export const TopNavBar = ({
   onZoomOut,
   onZoomReset,
   onChatToggle,
+  onUndo,
+  onRedo,
   zoom,
   isDarkMode,
   toggleTheme
 }: TopNavBarProps) => {
   // Format zoom level to percentage
   const zoomPercentage = Math.round(zoom * 100);
+  
+  // State for editable text
+  const [isEditing, setIsEditing] = useState(false);
+  const [editableText, setEditableText] = useState(() => {
+    // Load from localStorage on component mount
+    return localStorage.getItem('editableText') || 'Meow';
+  });
+
+  // Save to localStorage whenever text changes
+  useEffect(() => {
+    localStorage.setItem('editableText', editableText);
+  }, [editableText]);
+
+  const handleTextClick = () => {
+    setIsEditing(true);
+  };
+
+  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEditableText(e.target.value);
+  };
+
+  const handleTextBlur = () => {
+    setIsEditing(false);
+  };
+
+  const handleTextKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      setIsEditing(false);
+    }
+  };
   return <header className="h-14 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-3 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 transition-colors duration-200">
       <div className="flex items-center space-x-2">
         <Logo />
@@ -30,12 +64,12 @@ export const TopNavBar = ({
         </div>
       </div>
       <div className="flex items-center space-x-2">
-        <button className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-200">
+        <button className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-200" onClick={onUndo}>
           <div className="p-1 border border-gray-200 dark:border-gray-700 rounded">
             <Undo2Icon size={14} />
           </div>
         </button>
-        <button className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-200">
+        <button className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-200" onClick={onRedo}>
           <div className="p-1 border border-gray-200 dark:border-gray-700 rounded">
             <Redo2Icon size={14} />
           </div>
@@ -59,7 +93,25 @@ export const TopNavBar = ({
       </div>
       <div className="flex items-center space-x-1">
         <button className="px-3 py-1 rounded-md flex items-center hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-200">
-          <span className="font-medium">Meow</span>
+          {isEditing ? (
+            <input
+              type="text"
+              value={editableText}
+              onChange={handleTextChange}
+              onBlur={handleTextBlur}
+              onKeyDown={handleTextKeyDown}
+              className="text-xs font-medium bg-transparent border-none outline-none text-gray-800 dark:text-gray-200 min-w-0 w-auto max-w-32"
+              autoFocus
+            />
+          ) : (
+            <span 
+              className="text-xs font-medium cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200"
+              onClick={handleTextClick}
+              title="Click to edit"
+            >
+              {editableText}
+            </span>
+          )}
           <ChevronDownIcon size={16} className="ml-1" />
         </button>
       </div>
