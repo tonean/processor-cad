@@ -74,12 +74,12 @@ export function App() {
   };
 
   const handleZoomIn = () => {
-    const newZoom = Math.min(zoom + 0.1, 3);
+    const newZoom = Math.min(zoom + 0.25, 3);
     setZoom(newZoom);
   };
 
   const handleZoomOut = () => {
-    const newZoom = Math.max(zoom - 0.1, 0.5);
+    const newZoom = Math.max(zoom - 0.25, 0.5);
     setZoom(newZoom);
   };
 
@@ -212,41 +212,46 @@ export function App() {
   };
 
   const handleWheel = (event: React.WheelEvent) => {
+    // Only allow zooming when mouse is over canvas
     if (!isMouseOverCanvas) return;
     
-    // Check if this is a pinch gesture (touchpad pinch)
-    if (event.deltaMode === 1) {
+    // Check if this is a pinch-to-zoom gesture (ctrlKey is pressed during touchpad pinch)
+    if (event.ctrlKey) {
       event.preventDefault();
       
-      const delta = event.deltaY;
-      const zoomFactor = 0.1;
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (!rect) return;
       
-      if (delta > 0) {
-        // Zoom out
-        const newZoom = Math.max(zoom - zoomFactor, 0.5);
-        setZoom(newZoom);
-      } else {
-        // Zoom in
-        const newZoom = Math.min(zoom + zoomFactor, 3);
-        setZoom(newZoom);
-      }
+      // Get mouse position relative to canvas
+      const mouseX = event.clientX - rect.left;
+      const mouseY = event.clientY - rect.top;
+      
+      // Calculate zoom factor based on wheel delta
+      const delta = -event.deltaY;
+      const zoomFactor = delta > 0 ? 1.02 : 0.98; // Much smaller zoom factor for smoother zooming
+      const newZoom = Math.min(Math.max(zoom * zoomFactor, 0.1), 5);
+      
+      // Calculate new pan to zoom towards mouse cursor
+      const zoomRatio = newZoom / zoom;
+      const newPan = {
+        x: mouseX - (mouseX - pan.x) * zoomRatio,
+        y: mouseY - (mouseY - pan.y) * zoomRatio
+      };
+      
+      setZoom(newZoom);
+      setPan(newPan);
     }
-    // For regular mouse wheel, we can still allow it but with smaller increments
-    else if (Math.abs(event.deltaY) > 0) {
+    // Handle regular scrolling (for panning)
+    else if (!event.ctrlKey && (event.deltaX !== 0 || event.deltaY !== 0)) {
+      // Allow normal scrolling behavior when not pinch-zooming
+      // You can implement panning here if desired
       event.preventDefault();
       
-      const delta = event.deltaY;
-      const zoomFactor = 0.05; // Smaller increment for mouse wheel
-      
-      if (delta > 0) {
-        // Zoom out
-        const newZoom = Math.max(zoom - zoomFactor, 0.5);
-        setZoom(newZoom);
-      } else {
-        // Zoom in
-        const newZoom = Math.min(zoom + zoomFactor, 3);
-        setZoom(newZoom);
-      }
+      const panSpeed = 1;
+      setPan(prev => ({
+        x: prev.x - event.deltaX * panSpeed,
+        y: prev.y - event.deltaY * panSpeed
+      }));
     }
   };
 
