@@ -11,6 +11,9 @@ export function App() {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [leftSidebarWidth, setLeftSidebarWidth] = useState(256);
+  const [rightSidebarWidth, setRightSidebarWidth] = useState(256);
+  const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
   const [isDarkMode, setIsDarkMode] = useState(() => {
     // Check for saved theme preference or system preference
@@ -69,6 +72,22 @@ export function App() {
     setIsChatOpen(!isChatOpen);
   };
 
+  const handleLeftSidebarResize = (width: number) => {
+    setLeftSidebarWidth(width);
+  };
+
+  const handleRightSidebarResize = (width: number) => {
+    setRightSidebarWidth(width);
+  };
+
+  const handleLeftSidebarCollapse = () => {
+    setIsLeftSidebarCollapsed(true);
+  };
+
+  const handleRightSidebarCollapse = () => {
+    setIsChatOpen(false);
+  };
+
   const handleWheel = (event: React.WheelEvent) => {
     if (!isMouseOverCanvas) return;
     
@@ -118,6 +137,12 @@ export function App() {
 
   const handleMouseDown = (event: React.MouseEvent) => {
     if (event.button === 0) { // Left mouse button only
+      // Check if mouse is over a sidebar
+      const target = event.target as HTMLElement;
+      if (target.closest('aside')) {
+        return; // Don't start canvas dragging if over sidebar
+      }
+      
       setIsDragging(true);
       setDragStart({
         x: event.clientX - pan.x,
@@ -143,7 +168,22 @@ export function App() {
     <div className="flex flex-col h-screen w-full bg-white dark:bg-gray-900 overflow-hidden transition-colors duration-200">
       <TopNavBar onZoomIn={handleZoomIn} onZoomOut={handleZoomOut} onZoomReset={handleZoomReset} zoom={zoom} isDarkMode={isDarkMode} toggleTheme={toggleTheme} onChatToggle={handleChatToggle} />
       <div className="flex flex-1 overflow-hidden">
-        <Sidebar isDarkMode={isDarkMode} />
+        {!isLeftSidebarCollapsed && (
+          <Sidebar 
+            isDarkMode={isDarkMode} 
+            onResize={handleLeftSidebarResize}
+            onCollapse={handleLeftSidebarCollapse}
+            width={leftSidebarWidth}
+          />
+        )}
+        {isLeftSidebarCollapsed && (
+          <button
+            onClick={() => setIsLeftSidebarCollapsed(false)}
+            className="absolute left-0 top-1/2 transform -translate-y-1/2 z-40 w-6 h-12 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 rounded-r-lg flex items-center justify-center text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-200"
+          >
+            <div className="w-0 h-0 border-l-4 border-l-gray-400 border-t-4 border-t-transparent border-b-4 border-b-transparent"></div>
+          </button>
+        )}
         <main 
           ref={canvasRef}
           className="flex-1 relative bg-white dark:bg-gray-900 overflow-hidden transition-colors duration-200 canvas-zoom-area"
@@ -180,12 +220,21 @@ export function App() {
             }}
           />
         </main>
-        {isChatOpen && <RightSidebar isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} isDarkMode={isDarkMode} />}
+        {isChatOpen && (
+          <RightSidebar 
+            isOpen={isChatOpen} 
+            onClose={() => setIsChatOpen(false)} 
+            isDarkMode={isDarkMode}
+            onResize={handleRightSidebarResize}
+            onCollapse={handleRightSidebarCollapse}
+            width={rightSidebarWidth}
+          />
+        )}
       </div>
       <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2">
         <BottomToolbar isDarkMode={isDarkMode} />
       </div>
-      <div className="absolute bottom-6 right-6">
+      <div className="absolute bottom-6 right-6 z-10">
         <button className="w-8 h-8 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center text-gray-500 dark:text-gray-400 transition-colors duration-200">
           ?
         </button>
