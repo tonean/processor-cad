@@ -56,14 +56,14 @@ export const TopNavBar = ({
       setIsEditing(false);
     }
   };
-  return <header className="h-14 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-3 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 transition-colors duration-200">
+  return <header className="h-14 border-b border-gray-200 dark:border-gray-700 flex items-center px-3 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 transition-colors duration-200">
       <div className="flex items-center space-x-2">
         <Logo />
         <div className="h-6 w-6 flex items-center justify-center">
           <ChevronDownIcon size={16} />
         </div>
       </div>
-      <div className="flex items-center space-x-2">
+      <div className="flex items-center space-x-2 ml-6">
         <button className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-200" onClick={onUndo}>
           <div className="p-1 border border-gray-200 dark:border-gray-700 rounded">
             <Undo2Icon size={14} />
@@ -91,7 +91,7 @@ export const TopNavBar = ({
         <div className="h-4 border-r border-gray-200 dark:border-gray-700 mx-1"></div>
         <ThemeToggle isDarkMode={isDarkMode} toggleTheme={toggleTheme} />
       </div>
-      <div className="flex items-center space-x-1">
+      <div className="flex items-center space-x-1 ml-12">
         <button className="px-3 py-1 rounded-md flex items-center hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-200">
           {isEditing ? (
             <input
@@ -115,10 +115,7 @@ export const TopNavBar = ({
           <ChevronDownIcon size={16} className="ml-1" />
         </button>
       </div>
-      <div className="flex items-center space-x-3">
-        <div className="bg-blue-100 dark:bg-gray-700 text-blue-800 dark:text-gray-200 rounded-md px-3 py-1 text-sm transition-colors duration-200">
-          2 / 5
-        </div>
+      <div className="flex items-center space-x-3 ml-auto">
         <button className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-200" onClick={onChatToggle}>
           <MessageSquareIcon size={20} />
         </button>
