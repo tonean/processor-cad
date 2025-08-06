@@ -91,7 +91,7 @@ export const TopNavBar = ({
         <div className="h-4 border-r border-gray-200 dark:border-gray-700 mx-1"></div>
         <ThemeToggle isDarkMode={isDarkMode} toggleTheme={toggleTheme} />
       </div>
-      <div className="flex items-center space-x-1 ml-12">
+      <div className="flex items-center space-x-1 ml-20">
         <button className="px-3 py-1 rounded-md flex items-center hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-200">
           {isEditing ? (
             <input
