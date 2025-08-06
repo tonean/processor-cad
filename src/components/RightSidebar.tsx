@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageSquareIcon, PlusIcon, ChevronDownIcon, ImageIcon, MousePointerIcon, SlashIcon, Grid3X3Icon, ClockIcon, ArrowUpIcon } from 'lucide-react';
+import { MessageSquareIcon, PlusIcon, ChevronDownIcon, ImageIcon, MousePointerIcon, SlashIcon, Grid3X3Icon, ClockIcon, ArrowUpIcon, CodeIcon } from 'lucide-react';
 
 interface RightSidebarProps {
   isOpen: boolean;
@@ -21,6 +21,7 @@ export const RightSidebar = ({
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
   const [startWidth, setStartWidth] = useState(0);
+  const [activeTab, setActiveTab] = useState<'chat' | 'data'>('chat');
   const sidebarRef = useRef<HTMLDivElement>(null);
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -84,8 +85,8 @@ export const RightSidebar = ({
       style={{ width: `${width}px` }}
     >
       <div className="p-3 flex-1">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-sm font-medium">Chat</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-medium">Results</h2>
           <button 
             onClick={onClose}
             className="w-6 h-6 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors duration-200"
@@ -94,12 +95,46 @@ export const RightSidebar = ({
           </button>
         </div>
         
-        {/* No new chats message in the middle */}
+        {/* Tab Interface */}
+        <div className="flex items-center space-x-1 mb-3 p-1 rounded-md">
+          <button
+            onClick={() => setActiveTab('chat')}
+            className={`flex items-center space-x-1.5 px-2 py-1.5 rounded text-xs font-medium transition-colors duration-200 ${
+              activeTab === 'chat'
+                ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm'
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+            }`}
+          >
+            <MessageSquareIcon size={14} />
+            <span>Chat</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('data')}
+            className={`flex items-center space-x-1.5 px-2 py-1.5 rounded text-xs font-medium transition-colors duration-200 ${
+              activeTab === 'data'
+                ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm'
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+            }`}
+          >
+            <CodeIcon size={14} />
+            <span>Data</span>
+          </button>
+        </div>
+        
+        {/* Tab Content */}
+        {activeTab === 'chat' ? (
         <div className="flex-1 flex items-center justify-center mt-8">
           <div className="text-center">
             <p className="text-sm text-gray-500 dark:text-gray-400">No new chats</p>
           </div>
         </div>
+        ) : (
+          <div className="flex-1 flex items-center justify-center mt-8">
+            <div className="text-center">
+              <p className="text-sm text-gray-500 dark:text-gray-400">No data available</p>
+            </div>
+          </div>
+        )}
       </div>
       
       {/* Input field at the bottom */}

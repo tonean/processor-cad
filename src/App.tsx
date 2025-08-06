@@ -13,7 +13,7 @@ export function App() {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [leftSidebarWidth, setLeftSidebarWidth] = useState(256);
-  const [rightSidebarWidth, setRightSidebarWidth] = useState(256);
+  const [rightSidebarWidth, setRightSidebarWidth] = useState(320);
   const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] = useState(false);
   const [images, setImages] = useState<Array<{
     id: string;
@@ -294,7 +294,7 @@ export function App() {
         y: mouseY - (mouseY - pan.y) * zoomRatio
       };
       
-      setZoom(newZoom);
+        setZoom(newZoom);
       setPan(newPan);
     }
     // Handle regular scrolling (for panning)
@@ -596,90 +596,136 @@ export function App() {
             }}
           >
             {/* Render existing edges */}
-            {edges.map(edge => (
-              <g key={edge.id}>
-                <line
-                  x1={edge.startX * zoom + pan.x}
-                  y1={edge.startY * zoom + pan.y}
-                  x2={edge.endX * zoom + pan.x}
-                  y2={edge.endY * zoom + pan.y}
-                  stroke="#6b7280"
-                  strokeWidth="2"
-                  fill="none"
-                  markerEnd="url(#arrowhead)"
-                />
-                {/* Add a subtle shadow/glow effect */}
-                <line
-                  x1={edge.startX * zoom + pan.x}
-                  y1={edge.startY * zoom + pan.y}
-                  x2={edge.endX * zoom + pan.x}
-                  y2={edge.endY * zoom + pan.y}
-                  stroke="#3b82f6"
-                  strokeWidth="1"
-                  fill="none"
-                  opacity="0.6"
-                />
-              </g>
-            ))}
+            {edges.map(edge => {
+              // Calculate control points for smooth curve (ReactFlow style)
+              const startX = edge.startX * zoom + pan.x;
+              const startY = edge.startY * zoom + pan.y;
+              const endX = edge.endX * zoom + pan.x;
+              const endY = edge.endY * zoom + pan.y;
+              
+              // Calculate direction for curve
+              const deltaX = endX - startX;
+              const deltaY = endY - startY;
+              const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+              
+              // Determine curve direction based on connection direction
+              let offset = Math.min(distance * 0.3, 50);
+              let pathData;
+              
+              if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                // Horizontal connection - curve vertically
+                const controlX1 = startX + deltaX * 0.5;
+                const controlY1 = startY + (deltaY > 0 ? offset : -offset);
+                const controlX2 = startX + deltaX * 0.5;
+                const controlY2 = endY + (deltaY > 0 ? -offset : offset);
+                pathData = `M ${startX} ${startY} C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${endX} ${endY}`;
+              } else {
+                // Vertical connection - curve horizontally
+                const controlX1 = startX + (deltaX > 0 ? offset : -offset);
+                const controlY1 = startY + deltaY * 0.5;
+                const controlX2 = endX + (deltaX > 0 ? -offset : offset);
+                const controlY2 = startY + deltaY * 0.5;
+                pathData = `M ${startX} ${startY} C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${endX} ${endY}`;
+              }
+              
+              return (
+                <g key={edge.id}>
+                  <path
+                    d={pathData}
+                    stroke="#6b7280"
+                    strokeWidth="2"
+                    fill="none"
+                  />
+                  {/* Add a subtle shadow/glow effect */}
+                  <path
+                    d={pathData}
+                    stroke="#3b82f6"
+                    strokeWidth="1"
+                    fill="none"
+                    opacity="0.6"
+                  />
+                </g>
+              );
+            })}
             
             {/* Render edge being created */}
             {isCreatingEdge && edgeStart && (
-              <g>
-                <line
-                  x1={edgeStart.position.x * zoom + pan.x}
-                  y1={edgeStart.position.y * zoom + pan.y}
-                  x2={currentEdgeEnd.x * zoom + pan.x}
-                  y2={currentEdgeEnd.y * zoom + pan.y}
-                  stroke="#ef4444"
-                  strokeWidth="3"
-                  strokeDasharray="5,5"
-                  fill="none"
-                  markerEnd="url(#arrowhead-red)"
-                />
-                {/* Add a subtle shadow/glow effect for the creating edge */}
-                <line
-                  x1={edgeStart.position.x * zoom + pan.x}
-                  y1={edgeStart.position.y * zoom + pan.y}
-                  x2={currentEdgeEnd.x * zoom + pan.x}
-                  y2={currentEdgeEnd.y * zoom + pan.y}
-                  stroke="#fca5a5"
-                  strokeWidth="2"
-                  fill="none"
-                  opacity="0.8"
-                />
-              </g>
+              (() => {
+                const startX = edgeStart.position.x * zoom + pan.x;
+                const startY = edgeStart.position.y * zoom + pan.y;
+                const endX = currentEdgeEnd.x * zoom + pan.x;
+                const endY = currentEdgeEnd.y * zoom + pan.y;
+                
+                // Calculate direction for curve
+                const deltaX = endX - startX;
+                const deltaY = endY - startY;
+                const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+                
+                // Determine curve direction based on drag direction
+                let offset = Math.min(distance * 0.3, 50);
+                let pathData;
+                
+                if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                  // Horizontal drag - curve vertically
+                  const controlX1 = startX + deltaX * 0.5;
+                  const controlY1 = startY + (deltaY > 0 ? offset : -offset);
+                  const controlX2 = startX + deltaX * 0.5;
+                  const controlY2 = endY + (deltaY > 0 ? -offset : offset);
+                  pathData = `M ${startX} ${startY} C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${endX} ${endY}`;
+                  
+                  return (
+                    <g>
+                      <path
+                        d={pathData}
+                        stroke="#ef4444"
+                        strokeWidth="3"
+                        strokeDasharray="5,5"
+                        fill="none"
+                      />
+                      {/* Add a subtle shadow/glow effect for the creating edge */}
+                      <path
+                        d={pathData}
+                        stroke="#fca5a5"
+                        strokeWidth="2"
+                        fill="none"
+                        opacity="0.8"
+                      />
+                    </g>
+                  );
+                } else {
+                  // Vertical drag - curve horizontally
+                  const controlX1 = startX + (deltaX > 0 ? offset : -offset);
+                  const controlY1 = startY + deltaY * 0.5;
+                  const controlX2 = endX + (deltaX > 0 ? -offset : offset);
+                  const controlY2 = startY + deltaY * 0.5;
+                  pathData = `M ${startX} ${startY} C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${endX} ${endY}`;
+                  
+                  return (
+                    <g>
+                      <path
+                        d={pathData}
+                        stroke="#ef4444"
+                        strokeWidth="3"
+                        strokeDasharray="5,5"
+                        fill="none"
+                      />
+                      {/* Add a subtle shadow/glow effect for the creating edge */}
+                      <path
+                        d={pathData}
+                        stroke="#fca5a5"
+                        strokeWidth="2"
+                        fill="none"
+                        opacity="0.8"
+                      />
+                    </g>
+                  );
+                }
+              })()
             )}
             
-            {/* Arrow marker definitions */}
+            {/* Arrow marker definitions - removed */}
             <defs>
-              <marker
-                id="arrowhead"
-                markerWidth="10"
-                markerHeight="7"
-                refX="9"
-                refY="3.5"
-                orient="auto"
-                markerUnits="strokeWidth"
-              >
-                <polygon
-                  points="0 0, 10 3.5, 0 7"
-                  fill="#6b7280"
-                />
-              </marker>
-              <marker
-                id="arrowhead-red"
-                markerWidth="12"
-                markerHeight="8"
-                refX="10"
-                refY="4"
-                orient="auto"
-                markerUnits="strokeWidth"
-              >
-                <polygon
-                  points="0 0, 12 4, 0 8"
-                  fill="#ef4444"
-                />
-              </marker>
+              {/* No arrow markers */}
             </defs>
           </svg>
         </main>

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { PlusIcon } from 'lucide-react';
+import { PlusIcon, ChevronDownIcon } from 'lucide-react';
 
 interface SidebarProps {
   isDarkMode?: boolean;
@@ -69,15 +69,23 @@ export const Sidebar = ({
   return (
     <aside 
       ref={sidebarRef}
-      className="relative bg-white dark:bg-gray-900 overflow-y-auto text-gray-800 dark:text-gray-200 transition-colors duration-200 flex flex-col"
+      className="relative border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-y-auto text-gray-800 dark:text-gray-200 transition-colors duration-200 flex flex-col"
       style={{ width: `${width}px` }}
     >
       <div className="p-3 flex-1">
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-sm font-medium">Simulations</h2>
-          <button className="w-6 h-6 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors duration-200">
-            <PlusIcon size={16} />
-          </button>
+          <div className="flex items-center space-x-1">
+            <button className="w-6 h-6 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors duration-200">
+              <PlusIcon size={16} />
+            </button>
+            <button 
+              onClick={onCollapse}
+              className="w-6 h-6 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors duration-200"
+            >
+              <ChevronDownIcon size={16} />
+            </button>
+          </div>
         </div>
         <div className="mb-4">
           <button className="w-full text-left px-3 py-2 bg-blue-50 dark:bg-gray-700 text-blue-700 dark:text-gray-200 rounded-md transition-colors duration-200 text-sm">
