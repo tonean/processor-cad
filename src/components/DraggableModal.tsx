@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { XIcon } from 'lucide-react';
+import { XIcon, SendIcon } from 'lucide-react';
 
 interface DraggableModalProps {
   isOpen: boolean;
@@ -26,7 +26,21 @@ export const DraggableModal: React.FC<DraggableModalProps> = ({
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [inputValue, setInputValue] = useState('');
   const modalRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
+    }
+  }, [inputValue]);
+
+  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInputValue(e.target.value);
+  };
 
   const handleMouseDown = (e: React.MouseEvent) => {
     console.log('Modal mouse down - starting drag');
@@ -134,11 +148,28 @@ export const DraggableModal: React.FC<DraggableModalProps> = ({
         </button>
       </div>
       
-      {/* Empty content area */}
+      {/* Content area */}
       <div className="p-3">
-        <div className="text-gray-500 dark:text-gray-400 text-center py-8">
-          <p className="text-sm">Chat Node</p>
-          <p className="text-xs mt-2">Connect to other nodes</p>
+        <div className="space-y-4">
+          <div className="relative">
+            <textarea
+              ref={textareaRef}
+              value={inputValue}
+              onChange={handleTextareaChange}
+              placeholder="Add a chat to a specific CAD model element..."
+              rows={1}
+              className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 resize-none overflow-hidden"
+              style={{
+                minHeight: '40px',
+                maxHeight: '120px'
+              }}
+            />
+          </div>
+          
+          <button className="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200 flex items-center justify-center space-x-2">
+            <SendIcon size={16} />
+            <span>Send</span>
+          </button>
         </div>
       </div>
     </div>

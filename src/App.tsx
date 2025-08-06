@@ -208,8 +208,8 @@ export function App() {
     // Only set initial position if modal is not already open
     if (!isModalOpen) {
       // Position modal more to the right and down on the canvas
-      const initialX = -pan.x / zoom + 220; // More to the right (was 100)
-      const initialY = -pan.y / zoom + 170; // More down (was 100)
+      const initialX = -pan.x / zoom + 270; // More to the right (was 100)
+      const initialY = -pan.y / zoom + 400; // Much more down (was 170)
       setModalPosition({ x: initialX, y: initialY });
     }
     setIsModalOpen(true);
