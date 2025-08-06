@@ -44,6 +44,7 @@ export function App() {
     startY: number;
     endX: number;
     endY: number;
+    targetImageId?: string; // Added for image connections
   }>>([]);
   const [isCreatingEdge, setIsCreatingEdge] = useState(false);
   const [edgeStart, setEdgeStart] = useState<{ portId: string; position: { x: number; y: number } } | null>(null);
@@ -65,6 +66,78 @@ export function App() {
     }
     return false;
   });
+
+  // Function to calculate intersection point between a line and a rectangle
+  const calculateLineRectIntersection = (x1: number, y1: number, x2: number, y2: number, rectX: number, rectY: number, rectWidth: number, rectHeight: number) => {
+    const rectRight = rectX + rectWidth;
+    const rectBottom = rectY + rectHeight;
+    
+    // Check intersection with each edge of the rectangle
+    const intersections = [];
+    
+    // Top edge
+    if (y1 !== y2) {
+      const t = (rectY - y1) / (y2 - y1);
+      if (t >= 0 && t <= 1) {
+        const x = x1 + t * (x2 - x1);
+        if (x >= rectX && x <= rectRight) {
+          intersections.push({ x, y: rectY });
+        }
+      }
+    }
+    
+    // Bottom edge
+    if (y1 !== y2) {
+      const t = (rectBottom - y1) / (y2 - y1);
+      if (t >= 0 && t <= 1) {
+        const x = x1 + t * (x2 - x1);
+        if (x >= rectX && x <= rectRight) {
+          intersections.push({ x, y: rectBottom });
+        }
+      }
+    }
+    
+    // Left edge
+    if (x1 !== x2) {
+      const t = (rectX - x1) / (x2 - x1);
+      if (t >= 0 && t <= 1) {
+        const y = y1 + t * (y2 - y1);
+        if (y >= rectY && y <= rectBottom) {
+          intersections.push({ x: rectX, y });
+        }
+      }
+    }
+    
+    // Right edge
+    if (x1 !== x2) {
+      const t = (rectRight - x1) / (x2 - x1);
+      if (t >= 0 && t <= 1) {
+        const y = y1 + t * (y2 - y1);
+        if (y >= rectY && y <= rectBottom) {
+          intersections.push({ x: rectRight, y });
+        }
+      }
+    }
+    
+    // Find the closest intersection point to the start point
+    if (intersections.length > 0) {
+      let closest = intersections[0];
+      let minDistance = Math.sqrt((closest.x - x1) ** 2 + (closest.y - y1) ** 2);
+      
+      for (const intersection of intersections) {
+        const distance = Math.sqrt((intersection.x - x1) ** 2 + (intersection.y - y1) ** 2);
+        if (distance < minDistance) {
+          minDistance = distance;
+          closest = intersection;
+        }
+      }
+      
+      return closest;
+    }
+    
+    // Fallback to center if no intersection found
+    return { x: rectX + rectWidth / 2, y: rectY + rectHeight / 2 };
+  };
 
   useEffect(() => {
     // Apply dark mode class to document
@@ -144,6 +217,8 @@ export function App() {
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
+    // Remove all connections when modal is closed
+    setEdges([]);
   };
 
   const handleModalDrag = (newPosition: { x: number; y: number }) => {
@@ -169,6 +244,28 @@ export function App() {
         const canvasY = (mouseY - pan.y) / zoom;
         
         setCurrentEdgeEnd({ x: canvasX, y: canvasY });
+        
+        // Check if mouse is over any image
+        const targetImage = images.find(image => {
+          const imageScreenX = image.x * zoom + pan.x;
+          const imageScreenY = image.y * zoom + pan.y;
+          const imageScreenWidth = image.width * zoom;
+          const imageScreenHeight = image.height * zoom;
+          
+          return mouseX >= imageScreenX && 
+                 mouseX <= imageScreenX + imageScreenWidth &&
+                 mouseY >= imageScreenY && 
+                 mouseY <= imageScreenY + imageScreenHeight;
+        });
+        
+        // Update current target image for visual feedback
+        if (targetImage) {
+          // Highlight the target image
+          setImages(prev => prev.map(img => ({
+            ...img,
+            isSelected: img.id === targetImage.id
+          })));
+        }
       }
     }
   };
@@ -177,10 +274,78 @@ export function App() {
     if (isCreatingEdge && edgeStart) {
       console.log('Edge creation finished');
       
-      // Don't create permanent edges - just clear the dragging state
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (rect) {
+        // Find if we're dropping on an image
+        const targetImage = images.find(image => {
+          const imageScreenX = image.x * zoom + pan.x;
+          const imageScreenY = image.y * zoom + pan.y;
+          const imageScreenWidth = image.width * zoom;
+          const imageScreenHeight = image.height * zoom;
+          
+          const mouseX = currentEdgeEnd.x * zoom + pan.x;
+          const mouseY = currentEdgeEnd.y * zoom + pan.y;
+          
+          return mouseX >= imageScreenX && 
+                 mouseX <= imageScreenX + imageScreenWidth &&
+                 mouseY >= imageScreenY && 
+                 mouseY <= imageScreenY + imageScreenHeight;
+        });
+        
+        if (targetImage) {
+          // Calculate intersection point with image boundary
+          const imageScreenX = targetImage.x * zoom + pan.x;
+          const imageScreenY = targetImage.y * zoom + pan.y;
+          const imageScreenWidth = targetImage.width * zoom;
+          const imageScreenHeight = targetImage.height * zoom;
+          
+          // Use the current mouse position (where user released) to calculate the curve
+          const mouseScreenX = currentEdgeEnd.x * zoom + pan.x;
+          const mouseScreenY = currentEdgeEnd.y * zoom + pan.y;
+          
+          // Account for the blue outline offset (outline-offset-2 = 8px)
+          const outlineOffset = -200; // Reduced from 8 to 2 for much closer connection
+          const adjustedImageScreenX = imageScreenX - outlineOffset;
+          const adjustedImageScreenY = imageScreenY - outlineOffset;
+          const adjustedImageScreenWidth = imageScreenWidth + (outlineOffset * 2);
+          const adjustedImageScreenHeight = imageScreenHeight + (outlineOffset * 2);
+          
+          const intersection = calculateLineRectIntersection(
+            edgeStart.position.x * zoom + pan.x, edgeStart.position.y * zoom + pan.y,
+            mouseScreenX, mouseScreenY, // Use mouse position instead of image center
+            adjustedImageScreenX, adjustedImageScreenY, adjustedImageScreenWidth, adjustedImageScreenHeight
+          );
+          
+          // Convert intersection back to canvas coordinates
+          const endCanvasX = (intersection.x - pan.x) / zoom;
+          const endCanvasY = (intersection.y - pan.y) / zoom;
+          
+          // Create permanent connection to the image
+          const newEdge = {
+            id: `edge-${Date.now()}`,
+            sourcePort: edgeStart.portId,
+            targetPort: `image-${targetImage.id}`,
+            sourceNode: 'modal',
+            targetNode: targetImage.id,
+            startX: edgeStart.position.x,
+            startY: edgeStart.position.y,
+            endX: endCanvasX,
+            endY: endCanvasY,
+            targetImageId: targetImage.id
+          };
+          
+          setEdges(prev => [...prev, newEdge]);
+          console.log('Created connection to image:', targetImage.id);
+        }
+      }
+      
+      // Clear the dragging state
       setIsCreatingEdge(false);
       setEdgeStart(null);
       setCurrentEdgeEnd({ x: 0, y: 0 });
+      
+      // Clear image selection
+      setImages(prev => prev.map(img => ({ ...img, isSelected: false })));
     }
   };
 
@@ -597,11 +762,41 @@ export function App() {
           >
             {/* Render existing edges */}
             {edges.map(edge => {
-              // Calculate control points for smooth curve (ReactFlow style)
+              // Get the target image for silhouette color
+              const targetImage = images.find(img => img.id === edge.targetImageId);
+              
+              // Calculate start position
               const startX = edge.startX * zoom + pan.x;
               const startY = edge.startY * zoom + pan.y;
-              const endX = edge.endX * zoom + pan.x;
-              const endY = edge.endY * zoom + pan.y;
+              
+              // Calculate end position - if it's an image connection, calculate intersection with image boundary
+              let endX, endY;
+              if (targetImage) {
+                const imageScreenX = targetImage.x * zoom + pan.x;
+                const imageScreenY = targetImage.y * zoom + pan.y;
+                const imageScreenWidth = targetImage.width * zoom;
+                const imageScreenHeight = targetImage.height * zoom;
+                
+                // Account for the blue outline offset (outline-offset-2 = 8px)
+                const outlineOffset = 2; // Reduced from 8 to 2 for much closer connection
+                const adjustedImageScreenX = imageScreenX - outlineOffset;
+                const adjustedImageScreenY = imageScreenY - outlineOffset;
+                const adjustedImageScreenWidth = imageScreenWidth + (outlineOffset * 2);
+                const adjustedImageScreenHeight = imageScreenHeight + (outlineOffset * 2);
+                
+                // Calculate intersection point with image rectangle (including outline)
+                const intersection = calculateLineRectIntersection(
+                  startX, startY,
+                  imageScreenX + imageScreenWidth / 2, imageScreenY + imageScreenHeight / 2,
+                  adjustedImageScreenX, adjustedImageScreenY, adjustedImageScreenWidth, adjustedImageScreenHeight
+                );
+                
+                endX = intersection.x;
+                endY = intersection.y;
+              } else {
+                endX = edge.endX * zoom + pan.x;
+                endY = edge.endY * zoom + pan.y;
+              }
               
               // Calculate direction for curve
               const deltaX = endX - startX;
@@ -609,7 +804,7 @@ export function App() {
               const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
               
               // Determine curve direction based on connection direction
-              let offset = Math.min(distance * 0.3, 50);
+              let offset = Math.min(distance * 0.1, 20); // Reduced from 0.3 to 0.1 and max from 50 to 20
               let pathData;
               
               if (Math.abs(deltaX) > Math.abs(deltaY)) {
@@ -628,18 +823,21 @@ export function App() {
                 pathData = `M ${startX} ${startY} C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${endX} ${endY}`;
               }
               
+              // Use silhouette color if it's an image connection, otherwise use default
+              const strokeColor = targetImage ? '#3b82f6' : '#6b7280'; // Blue for image connections
+              
               return (
                 <g key={edge.id}>
                   <path
                     d={pathData}
-                    stroke="#6b7280"
-                    strokeWidth="2"
+                    stroke={strokeColor}
+                    strokeWidth="3"
                     fill="none"
                   />
                   {/* Add a subtle shadow/glow effect */}
                   <path
                     d={pathData}
-                    stroke="#3b82f6"
+                    stroke={strokeColor}
                     strokeWidth="1"
                     fill="none"
                     opacity="0.6"
@@ -662,7 +860,7 @@ export function App() {
                 const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
                 
                 // Determine curve direction based on drag direction
-                let offset = Math.min(distance * 0.3, 50);
+                let offset = Math.min(distance * 0.1, 20); // Reduced from 0.3 to 0.1 and max from 50 to 20
                 let pathData;
                 
                 if (Math.abs(deltaX) > Math.abs(deltaY)) {

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageSquareIcon, PlusIcon, ChevronDownIcon, ImageIcon, MousePointerIcon, SlashIcon, Grid3X3Icon, ClockIcon, ArrowUpIcon, CodeIcon } from 'lucide-react';
+import { MessageSquareIcon, PlusIcon, ChevronDownIcon, ImageIcon, MousePointerIcon, SlashIcon, Grid3X3Icon, ClockIcon, ArrowUpIcon, CodeIcon, BotIcon, UserIcon } from 'lucide-react';
 
 interface RightSidebarProps {
   isOpen: boolean;
@@ -8,6 +8,13 @@ interface RightSidebarProps {
   onResize?: (width: number) => void;
   onCollapse?: () => void;
   width?: number;
+}
+
+interface Message {
+  id: number;
+  sender: 'user' | 'bot';
+  content: string;
+  timestamp: string;
 }
 
 export const RightSidebar = ({ 
@@ -22,7 +29,109 @@ export const RightSidebar = ({
   const [startX, setStartX] = useState(0);
   const [startWidth, setStartWidth] = useState(0);
   const [activeTab, setActiveTab] = useState<'chat' | 'data'>('chat');
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: 1,
+      sender: 'bot',
+      content: import.meta.env.VITE_GEMINI_API_KEY 
+        ? "Hello! I'm your CAD assistant. I can help you with design questions, parametric modeling, assembly constraints, 3D printing optimization, and more. What would you like to work on today?"
+        : "Hello! I'm your CAD assistant, but I'm currently in demo mode. The API key is not configured. Please check your environment variables.",
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    }
+  ]);
+  const [inputValue, setInputValue] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  console.log('RightSidebar rendering, isOpen:', isOpen);
+  console.log('Environment check - API key exists:', !!import.meta.env.VITE_GEMINI_API_KEY);
+  console.log('Environment check - API key length:', import.meta.env.VITE_GEMINI_API_KEY?.length || 0);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const sendMessage = async () => {
+    if (!inputValue.trim() || isLoading) return;
+
+    const userMessage: Message = {
+      id: Date.now(),
+      sender: 'user',
+      content: inputValue.trim(),
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setInputValue('');
+    setIsLoading(true);
+
+    try {
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      console.log('API Key available:', !!apiKey);
+      
+      if (!apiKey) {
+        throw new Error('API key not found in environment variables');
+      }
+
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: `You are a helpful CAD (Computer-Aided Design) assistant. You help users with design questions, parametric modeling, assembly constraints, 3D printing optimization, and other CAD-related topics. Keep your responses concise and practical. User message: ${inputValue.trim()}`
+            }]
+          }]
+        })
+      });
+
+      console.log('API Response status:', response.status);
+      
+      if (!response.ok) {
+        throw new Error(`API request failed with status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('API Response data:', data);
+      
+      if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+        const botMessage: Message = {
+          id: Date.now() + 1,
+          sender: 'bot',
+          content: data.candidates[0].content.parts[0].text,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+        setMessages(prev => [...prev, botMessage]);
+      } else {
+        throw new Error('Invalid response format');
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      const errorMessage: Message = {
+        id: Date.now() + 1,
+        sender: 'bot',
+        content: `Sorry, I'm having trouble connecting right now. Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  };
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault(); // Prevent text selection
@@ -84,111 +193,159 @@ export const RightSidebar = ({
       className="relative border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-y-auto text-gray-800 dark:text-gray-200 transition-colors duration-200 flex flex-col z-50"
       style={{ width: `${width}px` }}
     >
-      <div className="p-3 flex-1">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-medium">Results</h2>
-          <button 
-            onClick={onClose}
-            className="w-6 h-6 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors duration-200"
-          >
-            <ChevronDownIcon size={16} />
-          </button>
-        </div>
-        
-        {/* Tab Interface */}
-        <div className="flex items-center space-x-1 mb-3 p-1 rounded-md">
-          <button
-            onClick={() => setActiveTab('chat')}
-            className={`flex items-center space-x-1.5 px-2 py-1.5 rounded text-xs font-medium transition-colors duration-200 ${
-              activeTab === 'chat'
-                ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm'
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-            }`}
-          >
-            <MessageSquareIcon size={14} />
-            <span>Chat</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('data')}
-            className={`flex items-center space-x-1.5 px-2 py-1.5 rounded text-xs font-medium transition-colors duration-200 ${
-              activeTab === 'data'
-                ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm'
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-            }`}
-          >
-            <CodeIcon size={14} />
-            <span>Data</span>
-          </button>
-        </div>
-        
-        {/* Tab Content */}
-        {activeTab === 'chat' ? (
-        <div className="flex-1 flex items-center justify-center mt-8">
-          <div className="text-center">
-            <p className="text-sm text-gray-500 dark:text-gray-400">No new chats</p>
+        <div className="p-3 flex-1">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-medium">Results</h2>
+            <button 
+              onClick={onClose}
+              className="w-6 h-6 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors duration-200"
+            >
+              <ChevronDownIcon size={16} />
+            </button>
           </div>
-        </div>
-        ) : (
-          <div className="flex-1 flex items-center justify-center mt-8">
-            <div className="text-center">
-              <p className="text-sm text-gray-500 dark:text-gray-400">No data available</p>
+          
+          {/* Tab Interface */}
+          <div className="flex items-center space-x-1 mb-3 p-1 rounded-md">
+            <button
+              onClick={() => setActiveTab('chat')}
+              className={`flex items-center space-x-1.5 px-2 py-1.5 rounded text-xs font-medium transition-colors duration-200 ${
+                activeTab === 'chat'
+                  ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+              }`}
+            >
+              <MessageSquareIcon size={14} />
+              <span>Chat</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('data')}
+              className={`flex items-center space-x-1.5 px-2 py-1.5 rounded text-xs font-medium transition-colors duration-200 ${
+                activeTab === 'data'
+                  ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+              }`}
+            >
+              <CodeIcon size={14} />
+              <span>Data</span>
+            </button>
+          </div>
+          
+          {/* Tab Content */}
+          {activeTab === 'chat' ? (
+            <div className="flex-1 overflow-y-auto">
+              <div className="space-y-3">
+                {messages.map((message) => (
+                  <div key={message.id} className="flex items-start space-x-2">
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
+                      message.sender === 'bot' 
+                        ? 'bg-blue-500 text-white' 
+                        : 'bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-200'
+                    }`}>
+                      {message.sender === 'bot' ? (
+                        <BotIcon size={12} />
+                      ) : (
+                        <UserIcon size={12} />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
+                        {message.sender === 'bot' ? 'Assistant' : 'You'} • {message.timestamp}
+                      </p>
+                      <p className="text-sm text-gray-800 dark:text-gray-200 leading-relaxed">
+                        {message.content}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+                {isLoading && (
+                  <div className="flex items-start space-x-2">
+                    <div className="w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center flex-shrink-0">
+                      <BotIcon size={12} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
+                        Assistant • typing...
+                      </p>
+                      <div className="flex space-x-1">
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
             </div>
-          </div>
-        )}
-      </div>
-      
-      {/* Input field at the bottom */}
-      <div className="p-3 border-t border-gray-200 dark:border-gray-700">
-        <div className="relative">
-          <input
-            type="text"
-            placeholder="Type / to see commands"
-            className="w-full px-4 py-3 pr-12 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:border-transparent transition-all duration-300"
-            onFocus={(e) => {
-              const isDark = document.documentElement.classList.contains('dark');
-              const bgColor = isDark ? '#1f2937' : 'white';
-              e.target.style.background = `linear-gradient(${bgColor}, ${bgColor}) padding-box, linear-gradient(45deg, #ff6b6b, #feca57, #48dbfb, #ff9ff3, #54a0ff, #5f27cd) border-box`;
-              e.target.style.border = '2px solid transparent';
-              e.target.style.backgroundSize = '400% 400%';
-              e.target.style.animation = 'gradientShift 3s ease infinite';
-            }}
-            onBlur={(e) => {
-              e.target.style.background = '';
-              e.target.style.border = '';
-              e.target.style.backgroundSize = '';
-              e.target.style.animation = '';
-            }}
-          />
-          <button className="absolute right-3 top-1/2 transform -translate-y-1/2 w-6 h-6 flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-200">
-            <ArrowUpIcon size={16} />
-          </button>
+          ) : (
+            <div className="flex-1 flex items-center justify-center mt-8">
+              <div className="text-center">
+                <p className="text-sm text-gray-500 dark:text-gray-400">No data available</p>
+              </div>
+            </div>
+          )}
         </div>
         
-        {/* Icons row below input */}
-        <div className="flex items-center space-x-4 mt-3">
-          <button className="w-6 h-6 flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-200">
-            <ImageIcon size={16} />
-          </button>
-          <button className="w-6 h-6 flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-200">
-            <MousePointerIcon size={16} />
-          </button>
-          <button className="w-6 h-6 flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-200">
-            <SlashIcon size={16} />
-          </button>
-          <button className="w-6 h-6 flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-200">
-            <Grid3X3Icon size={16} />
-          </button>
-          <button className="w-6 h-6 flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-200">
-            <ClockIcon size={16} />
-          </button>
+        {/* Input field at the bottom */}
+        <div className="p-3 border-t border-gray-200 dark:border-gray-700">
+          <div className="relative">
+            <input
+              type="text"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder="Type your message..."
+              disabled={isLoading}
+              className="w-full px-4 py-3 pr-12 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:border-transparent transition-all duration-300 disabled:opacity-50"
+              onFocus={(e) => {
+                const isDark = document.documentElement.classList.contains('dark');
+                const bgColor = isDark ? '#1f2937' : 'white';
+                e.target.style.background = `linear-gradient(${bgColor}, ${bgColor}) padding-box, linear-gradient(45deg, #ff6b6b, #feca57, #48dbfb, #ff9ff3, #54a0ff, #5f27cd) border-box`;
+                e.target.style.border = '2px solid transparent';
+                e.target.style.backgroundSize = '400% 400%';
+                e.target.style.animation = 'gradientShift 3s ease infinite';
+              }}
+              onBlur={(e) => {
+                e.target.style.background = '';
+                e.target.style.border = '';
+                e.target.style.backgroundSize = '';
+                e.target.style.animation = '';
+              }}
+            />
+            <button 
+              onClick={sendMessage}
+              disabled={!inputValue.trim() || isLoading}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 w-6 h-6 flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ArrowUpIcon size={16} />
+            </button>
+          </div>
+          
+          {/* Icons row below input */}
+          <div className="flex items-center space-x-4 mt-3">
+            <button className="w-6 h-6 flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-200">
+              <ImageIcon size={16} />
+            </button>
+            <button className="w-6 h-6 flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-200">
+              <MousePointerIcon size={16} />
+            </button>
+            <button className="w-6 h-6 flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-200">
+              <SlashIcon size={16} />
+            </button>
+            <button className="w-6 h-6 flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-200">
+              <Grid3X3Icon size={16} />
+            </button>
+            <button className="w-6 h-6 flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-200">
+              <ClockIcon size={16} />
+            </button>
+          </div>
         </div>
-      </div>
-      
-      {/* Drag handle */}
-      <div 
-        className="absolute left-0 top-0 bottom-0 w-4 cursor-col-resize select-none"
-        onMouseDown={handleMouseDown}
-      />
-    </aside>
-  );
+        
+        {/* Drag handle */}
+        <div 
+          className="absolute left-0 top-0 bottom-0 w-4 cursor-col-resize select-none"
+          onMouseDown={handleMouseDown}
+        />
+      </aside>
+    );
 }; 
