@@ -11,6 +11,11 @@ interface DraggableModalProps {
   canvasZoom?: number;
   canvasPan?: { x: number; y: number };
   onPortDrag?: (portId: string, startPosition: { x: number; y: number }) => void;
+  inputValue?: string;
+  onInputChange?: (value: string) => void;
+  onSendMessage?: () => void;
+  isLoading?: boolean;
+  isConnected?: boolean;
 }
 
 export const DraggableModal: React.FC<DraggableModalProps> = ({
@@ -22,11 +27,15 @@ export const DraggableModal: React.FC<DraggableModalProps> = ({
   onDrag,
   canvasZoom = 1,
   canvasPan = { x: 0, y: 0 },
-  onPortDrag
+  onPortDrag,
+  inputValue = '',
+  onInputChange,
+  onSendMessage,
+  isLoading = false,
+  isConnected = false
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const [inputValue, setInputValue] = useState('');
   const modalRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -39,7 +48,20 @@ export const DraggableModal: React.FC<DraggableModalProps> = ({
   }, [inputValue]);
 
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setInputValue(e.target.value);
+    onInputChange?.(e.target.value);
+  };
+
+  const handleSendMessage = () => {
+    if (inputValue.trim()) {
+      onSendMessage?.();
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -133,8 +155,14 @@ export const DraggableModal: React.FC<DraggableModalProps> = ({
       {/* Header */}
       <div className="flex items-center justify-center p-3 border-b border-gray-200 dark:border-gray-700">
         <h3 className="text-base font-medium text-gray-900 dark:text-gray-100 text-center">
-          Add a New Chat
+          Chat with CAD Element
         </h3>
+        {isConnected && (
+          <div className="absolute left-3 flex items-center space-x-1">
+            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+            <span className="text-xs text-green-600 dark:text-green-400">Connected</span>
+          </div>
+        )}
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -154,7 +182,8 @@ export const DraggableModal: React.FC<DraggableModalProps> = ({
               ref={textareaRef}
               value={inputValue}
               onChange={handleTextareaChange}
-              placeholder="Add a chat to a specific CAD model element..."
+              onKeyDown={handleKeyDown}
+              placeholder="Ask about this CAD element..."
               rows={1}
               className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 resize-none overflow-hidden"
               style={{
@@ -164,9 +193,13 @@ export const DraggableModal: React.FC<DraggableModalProps> = ({
             />
           </div>
           
-          <button className="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200 flex items-center justify-center space-x-2">
+          <button 
+            className="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200 flex items-center justify-center space-x-2"
+            onClick={handleSendMessage}
+            disabled={!inputValue.trim()}
+          >
             <SendIcon size={16} />
-            <span>Send</span>
+            <span>{isLoading ? 'Sending...' : 'Send'}</span>
           </button>
         </div>
       </div>

@@ -32,6 +32,8 @@ export function App() {
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalPosition, setModalPosition] = useState({ x: 100, y: 100 });
+  const [modalInputValue, setModalInputValue] = useState('');
+  const [modalIsLoading, setModalIsLoading] = useState(false);
   
   // Edge/Connection state
   const [edges, setEdges] = useState<Array<{
@@ -217,12 +219,144 @@ export function App() {
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
+    setModalInputValue('');
     // Remove all connections when modal is closed
     setEdges([]);
   };
 
   const handleModalDrag = (newPosition: { x: number; y: number }) => {
     setModalPosition(newPosition);
+  };
+
+  const handleModalInputChange = (value: string) => {
+    setModalInputValue(value);
+  };
+
+  const handleModalSendMessage = async () => {
+    if (!modalInputValue.trim() || modalIsLoading) return;
+
+    // Find the connected image for this modal
+    const connectedEdge = edges.find(edge => edge.sourceNode === 'modal');
+    if (!connectedEdge || !connectedEdge.targetImageId) {
+      // Add helpful message to the right sidebar chat
+      const helpMessage = {
+        id: Date.now(),
+        sender: 'bot' as const,
+        content: 'Please connect this chat to a CAD element first by dragging from the blue port at the top of the modal to an image on the canvas.',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+
+      if ((window as any).addMessageToChat) {
+        (window as any).addMessageToChat(helpMessage);
+      }
+      return;
+    }
+
+    const connectedImage = images.find(img => img.id === connectedEdge.targetImageId);
+    if (!connectedImage) {
+      console.log('Connected image not found');
+      return;
+    }
+
+    setModalIsLoading(true);
+
+    try {
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      
+      if (!apiKey) {
+        throw new Error('API key not found in environment variables');
+      }
+
+      // Prepare the message with image context
+      const messageWithContext = `You are a helpful CAD (Computer-Aided Design) assistant. The user has connected a chat to a specific CAD model element (image). Please analyze the image and respond to their question about this CAD element.
+
+User's question about the CAD element: ${modalInputValue.trim()}
+
+Please provide a detailed response about the CAD element shown in the image, addressing the user's specific question.`;
+
+      // Extract image data and mime type
+      const imageDataMatch = connectedImage.src.match(/^data:([^;]+);base64,(.+)$/);
+      if (!imageDataMatch) {
+        throw new Error('Invalid image data format');
+      }
+      
+      const mimeType = imageDataMatch[1];
+      const base64Data = imageDataMatch[2];
+
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              {
+                text: messageWithContext
+              },
+              {
+                inline_data: {
+                  mime_type: mimeType,
+                  data: base64Data
+                }
+              }
+            ]
+          }]
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`API request failed with status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+        const aiResponse = data.candidates[0].content.parts[0].text;
+        
+        // Add the conversation to the right sidebar chat
+        const userMessage = {
+          id: Date.now(),
+          sender: 'user' as const,
+          content: modalInputValue.trim(),
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+
+        const botMessage = {
+          id: Date.now() + 1,
+          sender: 'bot' as const,
+          content: aiResponse,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+
+        // Add messages to the right sidebar chat
+        if ((window as any).addMessageToChat) {
+          (window as any).addMessageToChat(userMessage);
+          (window as any).addMessageToChat(botMessage);
+        }
+        
+        // Clear the modal input
+        setModalInputValue('');
+      } else {
+        throw new Error('Invalid response format');
+      }
+    } catch (error) {
+      console.error('Error sending modal message:', error);
+      
+      // Add error message to the right sidebar chat
+      const errorMessage = {
+        id: Date.now() + 1,
+        sender: 'bot' as const,
+        content: `Sorry, I'm having trouble analyzing the CAD element. Please make sure the image is connected and try again. Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+
+      if ((window as any).addMessageToChat) {
+        (window as any).addMessageToChat(errorMessage);
+      }
+    } finally {
+      setModalIsLoading(false);
+    }
   };
 
   const handlePortDrag = (portId: string, startPosition: { x: number; y: number }) => {
@@ -726,6 +860,11 @@ export function App() {
                 canvasZoom={zoom}
                 canvasPan={pan}
                 onPortDrag={handlePortDrag}
+                inputValue={modalInputValue}
+                onInputChange={handleModalInputChange}
+                onSendMessage={handleModalSendMessage}
+                isLoading={modalIsLoading}
+                isConnected={edges.some(edge => edge.sourceNode === 'modal')}
               />
             </div>
           )}
@@ -977,6 +1116,10 @@ export function App() {
             onResize={handleRightSidebarResize}
             onCollapse={handleRightSidebarCollapse}
             width={rightSidebarWidth}
+            onAddMessage={(message) => {
+              // This will be implemented in RightSidebar
+              console.log('Adding message to sidebar:', message);
+            }}
           />
         )}
       </div>

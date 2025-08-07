@@ -8,6 +8,7 @@ interface RightSidebarProps {
   onResize?: (width: number) => void;
   onCollapse?: () => void;
   width?: number;
+  onAddMessage?: (message: Message) => void;
 }
 
 interface Message {
@@ -31,7 +32,8 @@ export const RightSidebar = ({
   isDarkMode, 
   onResize, 
   onCollapse, 
-  width = 256 
+  width = 256,
+  onAddMessage
 }: RightSidebarProps) => {
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
@@ -54,6 +56,24 @@ export const RightSidebar = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Function to add messages from external sources (like modal)
+  const addMessage = (message: Message) => {
+    setMessages(prev => [...prev, message]);
+  };
+
+  // Expose addMessage function to parent component
+  useEffect(() => {
+    if (onAddMessage) {
+      // Create a function that can be called from parent
+      const addMessageToChat = (message: Message) => {
+        addMessage(message);
+      };
+      
+      // Store it in a way that parent can access
+      (window as any).addMessageToChat = addMessageToChat;
+    }
+  }, [onAddMessage]);
 
   console.log('RightSidebar rendering, isOpen:', isOpen);
   console.log('Environment check - API key exists:', !!import.meta.env.VITE_GEMINI_API_KEY);
