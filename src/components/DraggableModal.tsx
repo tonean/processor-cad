@@ -147,10 +147,14 @@ export const DraggableModal: React.FC<DraggableModalProps> = ({
     >
       {/* Connection Ports */}
       <div
-        className="absolute top-0 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-blue-500 rounded-full cursor-crosshair hover:bg-blue-600 transition-colors duration-200"
-        style={{ top: '-8px' }}
+        className="absolute top-0 left-0 right-0 h-4 cursor-crosshair"
         onMouseDown={(e) => handlePortMouseDown(e, 'modal-top', 'top')}
-      />
+      >
+        <div
+          className="absolute top-0 left-1/2 transform -translate-x-1/2 w-3 h-3 bg-blue-500 rounded-full hover:bg-blue-600 transition-colors duration-200"
+          style={{ top: '-6px' }}
+        />
+      </div>
 
       {/* Header */}
       <div className="flex items-center justify-center p-3 border-b border-gray-200 dark:border-gray-700">

@@ -1012,8 +1012,9 @@ Please provide a detailed response about the CAD element shown in the image, add
                   <path
                     d={pathData}
                     stroke={strokeColor}
-                    strokeWidth="3"
+                    strokeWidth="2"
                     fill="none"
+                    markerEnd={targetImage ? "url(#arrowhead)" : "url(#arrowhead-red)"}
                   />
                   {/* Add a subtle shadow/glow effect */}
                   <path
@@ -1057,15 +1058,16 @@ Please provide a detailed response about the CAD element shown in the image, add
                       <path
                         d={pathData}
                         stroke="#ef4444"
-                        strokeWidth="3"
+                        strokeWidth="2"
                         strokeDasharray="5,5"
                         fill="none"
+                        markerEnd="url(#arrowhead-red)"
                       />
                       {/* Add a subtle shadow/glow effect for the creating edge */}
                       <path
                         d={pathData}
                         stroke="#fca5a5"
-                        strokeWidth="2"
+                        strokeWidth="1"
                         fill="none"
                         opacity="0.8"
                       />
@@ -1084,15 +1086,16 @@ Please provide a detailed response about the CAD element shown in the image, add
                       <path
                         d={pathData}
                         stroke="#ef4444"
-                        strokeWidth="3"
+                        strokeWidth="2"
                         strokeDasharray="5,5"
                         fill="none"
+                        markerEnd="url(#arrowhead-red)"
                       />
                       {/* Add a subtle shadow/glow effect for the creating edge */}
                       <path
                         d={pathData}
                         stroke="#fca5a5"
-                        strokeWidth="2"
+                        strokeWidth="1"
                         fill="none"
                         opacity="0.8"
                       />
@@ -1102,9 +1105,34 @@ Please provide a detailed response about the CAD element shown in the image, add
               })()
             )}
             
-            {/* Arrow marker definitions - removed */}
+            {/* Arrow marker definitions */}
             <defs>
-              {/* No arrow markers */}
+              <marker
+                id="arrowhead"
+                markerWidth="8"
+                markerHeight="6"
+                refX="6"
+                refY="3"
+                orient="auto"
+              >
+                <polygon
+                  points="0 0, 8 3, 0 6"
+                  fill="#3b82f6"
+                />
+              </marker>
+              <marker
+                id="arrowhead-red"
+                markerWidth="8"
+                markerHeight="6"
+                refX="6"
+                refY="3"
+                orient="auto"
+              >
+                <polygon
+                  points="0 0, 8 3, 0 6"
+                  fill="#ef4444"
+                />
+              </marker>
             </defs>
           </svg>
         </main>
