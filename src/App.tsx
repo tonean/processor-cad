@@ -235,6 +235,11 @@ export function App() {
   const handleModalSendMessage = async () => {
     if (!modalInputValue.trim() || modalIsLoading) return;
 
+    // Automatically open the right sidebar chat
+    if (!isChatOpen) {
+      setIsChatOpen(true);
+    }
+
     // Find the connected image for this modal
     const connectedEdge = edges.find(edge => edge.sourceNode === 'modal');
     if (!connectedEdge || !connectedEdge.targetImageId) {
