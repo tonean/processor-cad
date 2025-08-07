@@ -101,12 +101,10 @@ export const DraggableModal: React.FC<DraggableModalProps> = ({
   const handlePortMouseDown = (e: React.MouseEvent, portId: string, position: 'top' | 'bottom') => {
     e.stopPropagation();
     if (onPortDrag) {
-      const rect = modalRef.current?.getBoundingClientRect();
-      if (rect) {
-        const portX = modalPosition.x + (position === 'top' ? 200 : 200); // Center of modal
-        const portY = modalPosition.y + (position === 'top' ? 0 : 120); // Top or bottom of modal
-        onPortDrag(portId, { x: portX, y: portY });
-      }
+      // Port is at the top-center of the modal (which is 400px wide)
+      const portX = modalPosition.x + 200; // Center of modal (400px / 2)
+      const portY = modalPosition.y - 8; // Top of modal minus the port offset (port is positioned at top: -8px)
+      onPortDrag(portId, { x: portX, y: portY });
     }
   };
 

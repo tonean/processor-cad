@@ -293,32 +293,9 @@ export function App() {
         });
         
         if (targetImage) {
-          // Calculate intersection point with image boundary
-          const imageScreenX = targetImage.x * zoom + pan.x;
-          const imageScreenY = targetImage.y * zoom + pan.y;
-          const imageScreenWidth = targetImage.width * zoom;
-          const imageScreenHeight = targetImage.height * zoom;
-          
-          // Use the current mouse position (where user released) to calculate the curve
-          const mouseScreenX = currentEdgeEnd.x * zoom + pan.x;
-          const mouseScreenY = currentEdgeEnd.y * zoom + pan.y;
-          
-          // Account for the blue outline offset (outline-offset-2 = 8px)
-          const outlineOffset = -200; // Reduced from 8 to 2 for much closer connection
-          const adjustedImageScreenX = imageScreenX - outlineOffset;
-          const adjustedImageScreenY = imageScreenY - outlineOffset;
-          const adjustedImageScreenWidth = imageScreenWidth + (outlineOffset * 2);
-          const adjustedImageScreenHeight = imageScreenHeight + (outlineOffset * 2);
-          
-          const intersection = calculateLineRectIntersection(
-            edgeStart.position.x * zoom + pan.x, edgeStart.position.y * zoom + pan.y,
-            mouseScreenX, mouseScreenY, // Use mouse position instead of image center
-            adjustedImageScreenX, adjustedImageScreenY, adjustedImageScreenWidth, adjustedImageScreenHeight
-          );
-          
-          // Convert intersection back to canvas coordinates
-          const endCanvasX = (intersection.x - pan.x) / zoom;
-          const endCanvasY = (intersection.y - pan.y) / zoom;
+          // Store the mouse release position to preserve the exact curve shape
+          const mouseCanvasX = currentEdgeEnd.x;
+          const mouseCanvasY = currentEdgeEnd.y;
           
           // Create permanent connection to the image
           const newEdge = {
@@ -329,8 +306,8 @@ export function App() {
             targetNode: targetImage.id,
             startX: edgeStart.position.x,
             startY: edgeStart.position.y,
-            endX: endCanvasX,
-            endY: endCanvasY,
+            endX: mouseCanvasX, // Store the exact mouse position for curve calculation
+            endY: mouseCanvasY,
             targetImageId: targetImage.id
           };
           
@@ -699,8 +676,6 @@ export function App() {
                 top: `${image.y * zoom + pan.y}px`,
                 width: `${image.width * zoom}px`,
                 height: `${image.height * zoom}px`,
-                transform: `scale(${zoom})`,
-                transformOrigin: 'top left',
                 zIndex: image.isDragging ? 1000 : 100
               }}
             >
@@ -708,7 +683,11 @@ export function App() {
                 src={image.src}
                 alt="Dropped image"
                 className={`w-full h-full object-contain pointer-events-none ${
-                  image.isSelected ? 'outline outline-2 outline-blue-500 outline-offset-2' : ''
+                  edges.some(edge => edge.targetImageId === image.id) 
+                    ? 'outline outline-2 outline-blue-500 outline-offset-2' 
+                    : image.isSelected 
+                      ? 'outline outline-2 outline-blue-500 outline-offset-2' 
+                      : ''
                 }`}
                 draggable={false}
               />
@@ -765,62 +744,125 @@ export function App() {
               // Get the target image for silhouette color
               const targetImage = images.find(img => img.id === edge.targetImageId);
               
-              // Calculate start position
-              const startX = edge.startX * zoom + pan.x;
-              const startY = edge.startY * zoom + pan.y;
+              // Calculate start position - update based on current modal position
+              let startX, startY;
+              if (edge.sourceNode === 'modal') {
+                // Use current modal position for dynamic updates
+                // Port is at the top-center of the modal, positioned 8px above the modal
+                startX = (modalPosition.x + 200) * zoom + pan.x; // Center of modal (400px width / 2)
+                startY = (modalPosition.y - 8) * zoom + pan.y; // Port is 8px above modal top
+              } else {
+                startX = edge.startX * zoom + pan.x;
+                startY = edge.startY * zoom + pan.y;
+              }
               
               // Calculate end position - if it's an image connection, calculate intersection with image boundary
               let endX, endY;
+              let curveTargetX, curveTargetY; // For preserving the curve shape
+              
               if (targetImage) {
-                const imageScreenX = targetImage.x * zoom + pan.x;
-                const imageScreenY = targetImage.y * zoom + pan.y;
-                const imageScreenWidth = targetImage.width * zoom;
-                const imageScreenHeight = targetImage.height * zoom;
+                // Get the stored mouse position for curve shape
+                curveTargetX = edge.endX * zoom + pan.x;
+                curveTargetY = edge.endY * zoom + pan.y;
+                
+                // Calculate image bounds in canvas coordinates first
+                const imageX = targetImage.x;
+                const imageY = targetImage.y;
+                const imageWidth = targetImage.width;
+                const imageHeight = targetImage.height;
+                
+                // Transform to screen coordinates
+                const imageScreenX = imageX * zoom + pan.x;
+                const imageScreenY = imageY * zoom + pan.y;
+                const imageScreenWidth = imageWidth * zoom;
+                const imageScreenHeight = imageHeight * zoom;
                 
                 // Account for the blue outline offset (outline-offset-2 = 8px)
-                const outlineOffset = 2; // Reduced from 8 to 2 for much closer connection
+                // The outline-offset-2 in Tailwind is 8px, and the outline itself is 2px
+                // So we need to account for 10px total
+                const outlineOffset = 10;
                 const adjustedImageScreenX = imageScreenX - outlineOffset;
                 const adjustedImageScreenY = imageScreenY - outlineOffset;
                 const adjustedImageScreenWidth = imageScreenWidth + (outlineOffset * 2);
                 const adjustedImageScreenHeight = imageScreenHeight + (outlineOffset * 2);
                 
-                // Calculate intersection point with image rectangle (including outline)
+                // Calculate intersection point from modal to the curve target point
                 const intersection = calculateLineRectIntersection(
                   startX, startY,
-                  imageScreenX + imageScreenWidth / 2, imageScreenY + imageScreenHeight / 2,
-                  adjustedImageScreenX, adjustedImageScreenY, adjustedImageScreenWidth, adjustedImageScreenHeight
+                  curveTargetX, curveTargetY, // Use stored mouse position for proper curve
+                  adjustedImageScreenX, adjustedImageScreenY, 
+                  adjustedImageScreenWidth, adjustedImageScreenHeight
                 );
+                
+                // Debug logging
+                console.log('Connection debug:', {
+                  modalPos: { x: modalPosition.x, y: modalPosition.y },
+                  imagePos: { x: imageX, y: imageY, width: imageWidth, height: imageHeight },
+                  imageScreen: { 
+                    x: imageScreenX, 
+                    y: imageScreenY, 
+                    width: imageScreenWidth,
+                    height: imageScreenHeight
+                  },
+                  adjustedBounds: { 
+                    x: adjustedImageScreenX, 
+                    y: adjustedImageScreenY, 
+                    width: adjustedImageScreenWidth,
+                    height: adjustedImageScreenHeight
+                  },
+                  start: { x: startX, y: startY },
+                  curveTarget: { x: curveTargetX, y: curveTargetY },
+                  intersection: intersection,
+                  zoom: zoom,
+                  pan: pan
+                });
                 
                 endX = intersection.x;
                 endY = intersection.y;
               } else {
                 endX = edge.endX * zoom + pan.x;
                 endY = edge.endY * zoom + pan.y;
+                curveTargetX = endX;
+                curveTargetY = endY;
               }
               
-              // Calculate direction for curve
-              const deltaX = endX - startX;
-              const deltaY = endY - startY;
-              const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+              // Calculate curve using the original mouse position to preserve the shape
+              const deltaXCurve = curveTargetX - startX;
+              const deltaYCurve = curveTargetY - startY;
+              const distanceCurve = Math.sqrt(deltaXCurve * deltaXCurve + deltaYCurve * deltaYCurve);
               
-              // Determine curve direction based on connection direction
-              let offset = Math.min(distance * 0.1, 20); // Reduced from 0.3 to 0.1 and max from 50 to 20
+              // Use the actual end point for the final segment
+              const deltaXEnd = endX - startX;
+              const deltaYEnd = endY - startY;
+              
+              // Determine curve direction based on the original drag direction
+              let offset = Math.min(distanceCurve * 0.1, 20);
               let pathData;
               
-              if (Math.abs(deltaX) > Math.abs(deltaY)) {
+              if (Math.abs(deltaXCurve) > Math.abs(deltaYCurve)) {
                 // Horizontal connection - curve vertically
-                const controlX1 = startX + deltaX * 0.5;
-                const controlY1 = startY + (deltaY > 0 ? offset : -offset);
-                const controlX2 = startX + deltaX * 0.5;
-                const controlY2 = endY + (deltaY > 0 ? -offset : offset);
-                pathData = `M ${startX} ${startY} C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${endX} ${endY}`;
+                const controlX1 = startX + deltaXCurve * 0.5;
+                const controlY1 = startY + (deltaYCurve > 0 ? offset : -offset);
+                const controlX2 = startX + deltaXCurve * 0.5;
+                const controlY2 = curveTargetY + (deltaYCurve > 0 ? -offset : offset);
+                
+                // Adjust the final control point to smoothly connect to the intersection
+                const finalControlX = endX - (endX - controlX2) * 0.3;
+                const finalControlY = endY - (endY - controlY2) * 0.3;
+                
+                pathData = `M ${startX} ${startY} C ${controlX1} ${controlY1}, ${finalControlX} ${finalControlY}, ${endX} ${endY}`;
               } else {
                 // Vertical connection - curve horizontally
-                const controlX1 = startX + (deltaX > 0 ? offset : -offset);
-                const controlY1 = startY + deltaY * 0.5;
-                const controlX2 = endX + (deltaX > 0 ? -offset : offset);
-                const controlY2 = startY + deltaY * 0.5;
-                pathData = `M ${startX} ${startY} C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${endX} ${endY}`;
+                const controlX1 = startX + (deltaXCurve > 0 ? offset : -offset);
+                const controlY1 = startY + deltaYCurve * 0.5;
+                const controlX2 = curveTargetX + (deltaXCurve > 0 ? -offset : offset);
+                const controlY2 = startY + deltaYCurve * 0.5;
+                
+                // Adjust the final control point to smoothly connect to the intersection
+                const finalControlX = endX - (endX - controlX2) * 0.3;
+                const finalControlY = endY - (endY - controlY2) * 0.3;
+                
+                pathData = `M ${startX} ${startY} C ${controlX1} ${controlY1}, ${finalControlX} ${finalControlY}, ${endX} ${endY}`;
               }
               
               // Use silhouette color if it's an image connection, otherwise use default
