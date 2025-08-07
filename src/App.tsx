@@ -887,9 +887,9 @@ Please provide a detailed response about the CAD element shown in the image, add
               let startX, startY;
               if (edge.sourceNode === 'modal') {
                 // Use current modal position for dynamic updates
-                // Port is at the top-center of the modal, positioned 8px above the modal
+                // The dot center is 6px above the modal top (top: -6px) plus half the dot height (1.5px for a 3px dot)
                 startX = (modalPosition.x + 200) * zoom + pan.x; // Center of modal (400px width / 2)
-                startY = (modalPosition.y - 8) * zoom + pan.y; // Port is 8px above modal top
+                startY = (modalPosition.y - 4.5) * zoom + pan.y; // Center of the dot (6px above - 1.5px to center)
               } else {
                 startX = edge.startX * zoom + pan.x;
                 startY = edge.startY * zoom + pan.y;

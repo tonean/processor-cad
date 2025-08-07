@@ -124,8 +124,9 @@ export const DraggableModal: React.FC<DraggableModalProps> = ({
     e.stopPropagation();
     if (onPortDrag) {
       // Port is at the top-center of the modal (which is 400px wide)
+      // The dot center is 6px above the modal top (top: -6px) plus half the dot height (1.5px for a 3px dot)
       const portX = modalPosition.x + 200; // Center of modal (400px / 2)
-      const portY = modalPosition.y - 8; // Top of modal minus the port offset (port is positioned at top: -8px)
+      const portY = modalPosition.y - 4.5; // Center of the dot (6px above - 1.5px to center)
       onPortDrag(portId, { x: portX, y: portY });
     }
   };
