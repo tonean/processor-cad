@@ -4,6 +4,7 @@ import { Sidebar } from './components/Sidebar';
 import { BottomToolbar } from './components/BottomToolbar';
 import { RightSidebar } from './components/RightSidebar';
 import { DraggableModal } from './components/DraggableModal';
+import { CADViewer3D } from './components/CADViewer3D';
 
 export function App() {
   const [zoom, setZoom] = useState(0.8);
@@ -34,6 +35,10 @@ export function App() {
   const [modalPosition, setModalPosition] = useState({ x: 100, y: 100 });
   const [modalInputValue, setModalInputValue] = useState('');
   const [modalIsLoading, setModalIsLoading] = useState(false);
+  
+  // 3D CAD Model state
+  const [cadModel, setCadModel] = useState<any>(null);
+  const [show3DScene, setShow3DScene] = useState(false);
   
   // Edge/Connection state
   const [edges, setEdges] = useState<Array<{
@@ -163,6 +168,36 @@ export function App() {
     };
   }, []);
 
+  // Render 3D CAD model to main canvas
+  useEffect(() => {
+    if (show3DScene && cadModel && cadModel.renderer) {
+      const canvas = document.getElementById('main-cad-canvas') as HTMLCanvasElement;
+      if (canvas) {
+        // Set canvas size to match the main canvas
+        const mainCanvas = canvasRef.current;
+        if (mainCanvas) {
+          canvas.width = mainCanvas.offsetWidth;
+          canvas.height = mainCanvas.offsetHeight;
+          
+          // Update renderer and camera
+          cadModel.renderer.setSize(canvas.width, canvas.height);
+          cadModel.camera.aspect = canvas.width / canvas.height;
+          cadModel.camera.updateProjectionMatrix();
+          
+          // Render the scene
+          cadModel.renderer.render(cadModel.scene, cadModel.camera);
+          
+          // Display the rendered image
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(cadModel.renderer.domElement, 0, 0, canvas.width, canvas.height);
+          }
+        }
+      }
+    }
+  }, [show3DScene, cadModel]);
+
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
   };
@@ -204,6 +239,27 @@ export function App() {
 
   const handleRightSidebarCollapse = () => {
     setIsChatOpen(false);
+  };
+
+  const handleCADModelGenerated = (model: any) => {
+    console.log('CAD model received:', model);
+    
+    // Handle both Three.js models and CADModel format from SLM generator
+    if (model) {
+      if (model.components && !model.scene) {
+        // This is a CADModel from SLM generator - display it using CADViewer3D
+        console.log('SLM CAD model received, setting up for display...');
+        setCadModel(model);
+        setShow3DScene(true);
+      } else if (model.scene && model.camera && model.renderer) {
+        // This is a valid Three.js model
+        console.log('Valid Three.js model received, displaying...');
+        setCadModel(model);
+        setShow3DScene(true);
+      } else {
+        console.log('Model format not recognized:', model);
+      }
+    }
   };
 
   const handleOpenModal = () => {
@@ -372,7 +428,7 @@ Please provide a detailed response about the CAD element shown in the image, add
   };
 
   const handleCanvasMouseMove = (e: React.MouseEvent) => {
-    if (isCreatingEdge) {
+    if (isCreatingEdge && edgeStart) {
       const rect = canvasRef.current?.getBoundingClientRect();
       if (rect) {
         const mouseX = e.clientX - rect.left;
@@ -787,6 +843,22 @@ Please provide a detailed response about the CAD element shown in the image, add
           onDragOver={handleDragOver}
           onDrop={handleDrop}
         >
+          {/* 3D CAD Scene - Integrated into dotted canvas */}
+          {show3DScene && cadModel && (
+            <div className="absolute inset-0 z-10">
+              <canvas 
+                id="main-cad-canvas" 
+                className="w-full h-full"
+                style={{ 
+                  background: 'transparent',
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  zIndex: 10
+                }}
+              />
+            </div>
+          )}
           {/* Infinite dotted grid background with zoom applied */}
           <div 
             className="absolute bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] dark:bg-[radial-gradient(#4a5568_1px,transparent_1px)] origin-center transition-colors duration-200" 
@@ -1013,27 +1085,18 @@ Please provide a detailed response about the CAD element shown in the image, add
               const strokeColor = targetImage ? '#3b82f6' : '#6b7280'; // Blue for image connections
               
               return (
-                <g key={edge.id}>
-                  <path
-                    d={pathData}
-                    stroke={strokeColor}
-                    strokeWidth="2"
-                    fill="none"
-                    markerEnd={targetImage ? "url(#arrowhead)" : "url(#arrowhead-red)"}
-                  />
-                  {/* Add a subtle shadow/glow effect */}
-                  <path
-                    d={pathData}
-                    stroke={strokeColor}
-                    strokeWidth="1"
-                    fill="none"
-                    opacity="0.6"
-                  />
-                </g>
+                <path
+                  key={edge.id}
+                  d={pathData}
+                  stroke={strokeColor}
+                  strokeWidth="2"
+                  fill="none"
+                  markerEnd={targetImage ? "url(#arrowhead)" : "url(#arrowhead-red)"}
+                />
               );
             })}
             
-            {/* Render edge being created */}
+                        {/* Render edge being created */}
             {isCreatingEdge && edgeStart && (
               (() => {
                 const startX = edgeStart.position.x * zoom + pan.x;
@@ -1047,7 +1110,7 @@ Please provide a detailed response about the CAD element shown in the image, add
                 const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
                 
                 // Determine curve direction based on drag direction
-                let offset = Math.min(distance * 0.1, 20); // Reduced from 0.3 to 0.1 and max from 50 to 20
+                let offset = Math.min(distance * 0.1, 20);
                 let pathData;
                 
                 if (Math.abs(deltaX) > Math.abs(deltaY)) {
@@ -1057,27 +1120,6 @@ Please provide a detailed response about the CAD element shown in the image, add
                   const controlX2 = startX + deltaX * 0.5;
                   const controlY2 = endY + (deltaY > 0 ? -offset : offset);
                   pathData = `M ${startX} ${startY} C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${endX} ${endY}`;
-                  
-                  return (
-                    <g>
-                      <path
-                        d={pathData}
-                        stroke="#ef4444"
-                        strokeWidth="2"
-                        strokeDasharray="5,5"
-                        fill="none"
-                        markerEnd="url(#arrowhead-red)"
-                      />
-                      {/* Add a subtle shadow/glow effect for the creating edge */}
-                      <path
-                        d={pathData}
-                        stroke="#fca5a5"
-                        strokeWidth="1"
-                        fill="none"
-                        opacity="0.8"
-                      />
-                    </g>
-                  );
                 } else {
                   // Vertical drag - curve horizontally
                   const controlX1 = startX + (deltaX > 0 ? offset : -offset);
@@ -1085,28 +1127,19 @@ Please provide a detailed response about the CAD element shown in the image, add
                   const controlX2 = endX + (deltaX > 0 ? -offset : offset);
                   const controlY2 = startY + deltaY * 0.5;
                   pathData = `M ${startX} ${startY} C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${endX} ${endY}`;
-                  
-                  return (
-                    <g>
-                      <path
-                        d={pathData}
-                        stroke="#ef4444"
-                        strokeWidth="2"
-                        strokeDasharray="5,5"
-                        fill="none"
-                        markerEnd="url(#arrowhead-red)"
-                      />
-                      {/* Add a subtle shadow/glow effect for the creating edge */}
-                      <path
-                        d={pathData}
-                        stroke="#fca5a5"
-                        strokeWidth="1"
-                        fill="none"
-                        opacity="0.8"
-                      />
-                    </g>
-                  );
                 }
+                
+                return (
+                  <path
+                    key="creating-edge"
+                    d={pathData}
+                    stroke="#3b82f6"
+                    strokeWidth="2"
+                    strokeDasharray="5,5"
+                    fill="none"
+                    markerEnd="url(#arrowhead)"
+                  />
+                );
               })()
             )}
             
@@ -1140,6 +1173,24 @@ Please provide a detailed response about the CAD element shown in the image, add
               </marker>
             </defs>
           </svg>
+          {/* 3D CAD Viewer Overlay */}
+          {show3DScene && cadModel && cadModel.components && (
+            <div className="absolute inset-0 z-40 pointer-events-auto">
+              <CADViewer3D 
+                model={cadModel}
+                isDarkMode={isDarkMode}
+                onComponentClick={(component) => {
+                  console.log('Component clicked:', component);
+                }}
+              />
+              <button
+                onClick={() => setShow3DScene(false)}
+                className="absolute top-4 right-4 z-50 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg transition-colors"
+              >
+                Close 3D View
+              </button>
+            </div>
+          )}
         </main>
         {isChatOpen && (
           <RightSidebar 
@@ -1153,6 +1204,7 @@ Please provide a detailed response about the CAD element shown in the image, add
               // This will be implemented in RightSidebar
               console.log('Adding message to sidebar:', message);
             }}
+            onCADModelGenerated={handleCADModelGenerated}
           />
         )}
       </div>
