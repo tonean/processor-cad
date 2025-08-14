@@ -31,6 +31,7 @@ const loadSimplePDFProcessor = async () => {
 import { MultiAgentCADSystem, ResearchPaperAnalysis, CADModel as MultiAgentCADModel } from '../services/MultiAgentCAD';
 import { OpenCASCADEService } from '../services/OpenCASCADEService';
 import { SLMHolographicGenerator } from '../services/SLMHolographicGenerator';
+import { NaturalLanguageCADService, CADSpecification } from '../services/NaturalLanguageCADService';
 import * as THREE from 'three';
 
 interface RightSidebarProps {
@@ -93,6 +94,8 @@ export const RightSidebar = ({
   const [thoughtChain, setThoughtChain] = useState<string[]>([]);
   const [simulationConfig, setSimulationConfig] = useState<any | null>(null);
   const [isSimulating, setIsSimulating] = useState(false);
+  const [nlCADService] = useState(() => new NaturalLanguageCADService());
+  const [currentCADSpec, setCurrentCADSpec] = useState<CADSpecification | null>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -433,6 +436,160 @@ export const RightSidebar = ({
     const hasPDFs = selectedFiles.some(file => file.type === 'application/pdf');
     // Only require input text - files are optional
     if (isLoading || !inputValue.trim()) return;
+
+    // Check for Natural Language CAD commands first - much more flexible
+    const lowerInput = inputValue.toLowerCase();
+    
+    // Check for ball/sphere creation
+    const ballWords = ['ball', 'sphere', 'orb', 'globe'];
+    const createWords = ['make', 'create', 'generate', 'build', 'give', 'show', 'add', 'spawn', 'can you', 'could you', 'please'];
+    const bounceWords = ['bounce', 'bouncy', 'bouncing', 'jump', 'hop', 'hopping'];
+    
+    const hasBallWord = ballWords.some(word => lowerInput.includes(word));
+    const hasCreateWord = createWords.some(word => lowerInput.includes(word));
+    const hasBounceWord = bounceWords.some(word => lowerInput.includes(word));
+    
+    // Detect if it's a NL CAD command
+    const isNLCADCommand = (hasBallWord && hasCreateWord) || 
+                          (hasBallWord && lowerInput.includes('me a')) ||
+                          (hasBounceWord && (lowerInput.includes('ball') || lowerInput.includes('it') || lowerInput.includes('them')));
+    
+    if (isNLCADCommand) {
+      const userMessage: Message = {
+        id: Date.now(),
+        sender: 'user',
+        content: inputValue.trim(),
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      setMessages(prev => [...prev, userMessage]);
+      setInputValue('');
+      setIsLoading(true);
+
+      try {
+        // Parse the natural language input
+        const spec = nlCADService.parseNaturalLanguage(inputValue);
+        setCurrentCADSpec(spec);
+        
+        // Create a container for the 3D scene if needed
+        const container = document.createElement('div');
+        container.style.width = '100%';
+        container.style.height = '100%';
+        container.style.position = 'absolute';
+        container.style.top = '0';
+        container.style.left = '0';
+        
+        // Execute the specification and create/animate the 3D scene
+        const scene = await nlCADService.executeSpecification(spec, container);
+        
+        // Package the model for display
+        const nlCADModel = {
+          scene: nlCADService.getScene(),
+          camera: nlCADService.getCamera(),
+          renderer: nlCADService.getRenderer(),
+          name: 'Natural Language CAD Model',
+          components: spec.objects.map(obj => ({
+            id: obj.id,
+            name: obj.name,
+            type: obj.type,
+            geometry: {
+              type: obj.type,
+              parameters: {
+                radius: obj.radius_m,
+                diameter: obj.diameter_m,
+                width: obj.width_m,
+                height: obj.height_m,
+                depth: obj.depth_m
+              },
+              position: obj.position || { x: 0, y: 0, z: 0 },
+              rotation: { x: 0, y: 0, z: 0 },
+              scale: { x: 1, y: 1, z: 1 }
+            },
+            material: obj.material
+          }))
+        };
+        
+        // Pass to parent component to display in canvas
+        onCADModelGenerated?.(nlCADModel);
+        
+        // Generate response message with spec details
+        let responseContent = `✅ **CAD Specification Generated**\n\n`;
+        responseContent += `**Intent:** ${spec.intent}\n`;
+        responseContent += `**Explanation:** ${spec.explain}\n\n`;
+        
+        if (spec.objects.length > 0) {
+          responseContent += `**Objects Created:**\n`;
+          spec.objects.forEach(obj => {
+            responseContent += `• **${obj.name}** (${obj.type})\n`;
+            if (obj.diameter_m) responseContent += `  - Diameter: ${(obj.diameter_m * 100).toFixed(1)} cm\n`;
+            if (obj.radius_m) responseContent += `  - Radius: ${(obj.radius_m * 100).toFixed(1)} cm\n`;
+            responseContent += `  - Mass: ${obj.mass_kg.toFixed(3)} kg\n`;
+            responseContent += `  - Density: ${obj.density_kg_m3} kg/m³\n`;
+            if (obj.meta.assumptions.length > 0) {
+              responseContent += `  - Assumptions: ${obj.meta.assumptions.join(', ')}\n`;
+            }
+          });
+        }
+        
+        if (spec.actions.length > 0) {
+          responseContent += `\n**Actions Applied:**\n`;
+          spec.actions.forEach(action => {
+            if (action.type === 'set_restitution') {
+              responseContent += `• Set bounciness (restitution): ${action.value}\n`;
+            } else if (action.type === 'apply_impulse') {
+              responseContent += `• Applied impulse: ${action.impulse_Ns?.toFixed(2)} N·s upward\n`;
+            }
+          });
+        }
+        
+        if (spec.warnings.length > 0) {
+          responseContent += `\n⚠️ **Warnings:**\n`;
+          spec.warnings.forEach(warning => {
+            responseContent += `• ${warning}\n`;
+          });
+        }
+        
+        responseContent += `\n**Numeric Validation:**\n`;
+        if (spec.objects.length > 0) {
+          const obj = spec.objects[0];
+          if (obj.radius_m) {
+            const r = obj.radius_m;
+            const r3 = Math.pow(r, 3);
+            const volume = (4/3) * Math.PI * r3;
+            responseContent += `• r = ${r.toFixed(4)} m\n`;
+            responseContent += `• r³ = ${r3.toFixed(8)} m³\n`;
+            responseContent += `• V = (4/3) × π × r³ = ${volume.toFixed(8)} m³\n`;
+            responseContent += `• Mass = ρ × V = ${obj.density_kg_m3} × ${volume.toFixed(8)} = ${obj.mass_kg.toFixed(6)} kg\n`;
+          }
+        }
+        
+        responseContent += `\n**Next Steps:**\n`;
+        spec.next_steps_suggestion.forEach(step => {
+          responseContent += `• ${step}\n`;
+        });
+        
+        const botMessage: Message = {
+          id: Date.now() + 1,
+          sender: 'bot',
+          content: responseContent,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+        setMessages(prev => [...prev, botMessage]);
+        
+      } catch (error) {
+        console.error('Error processing NL CAD command:', error);
+        const errorMessage: Message = {
+          id: Date.now() + 1,
+          sender: 'bot',
+          content: `❌ Error processing CAD command: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+        setMessages(prev => [...prev, errorMessage]);
+      } finally {
+        setIsLoading(false);
+      }
+      
+      return; // Exit early, don't call the regular API
+    }
 
     // Check if there are PDF files to process
     const pdfFiles = selectedFiles.filter(file => file.type === 'application/pdf');
