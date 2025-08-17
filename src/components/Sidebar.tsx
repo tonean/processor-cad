@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { PlusIcon, ChevronDownIcon, Trash2Icon } from 'lucide-react';
+import { PlusIcon, ChevronDownIcon, Trash2Icon, PlayIcon, PauseIcon, SquareIcon } from 'lucide-react';
 
 interface SidebarProps {
   isDarkMode?: boolean;
@@ -21,6 +21,7 @@ export const Sidebar = ({
   const [selectedTest, setSelectedTest] = useState('Test 1');
   const [editingTest, setEditingTest] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState('');
+  const [playingTests, setPlayingTests] = useState<Set<string>>(new Set());
   const sidebarRef = useRef<HTMLDivElement>(null);
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -109,6 +110,13 @@ export const Sidebar = ({
     // Remove the test from the list
     setTestButtons(prev => prev.filter(name => name !== testName));
     
+    // Remove from playing tests if it was playing
+    setPlayingTests(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(testName);
+      return newSet;
+    });
+    
     // If the deleted test was selected, select the first remaining test
     if (selectedTest === testName) {
       const remainingTests = testButtons.filter(name => name !== testName);
@@ -116,6 +124,30 @@ export const Sidebar = ({
         setSelectedTest(remainingTests[0]);
       }
     }
+  };
+
+  const handlePlayPause = (e: React.MouseEvent, testName: string) => {
+    e.stopPropagation(); // Prevent test selection
+    
+    setPlayingTests(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(testName)) {
+        newSet.delete(testName); // Pause
+      } else {
+        newSet.add(testName); // Play
+      }
+      return newSet;
+    });
+  };
+
+  const handleStop = (e: React.MouseEvent, testName: string) => {
+    e.stopPropagation(); // Prevent test selection
+    
+    setPlayingTests(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(testName); // Stop (same as pause for now)
+      return newSet;
+    });
   };
 
   useEffect(() => {
@@ -154,50 +186,93 @@ export const Sidebar = ({
           </div>
         </div>
         <div className="mb-4 space-y-2">
-          {testButtons.map((testName) => (
-            <div
-              key={testName}
-              className="group relative"
-            >
-              <button
-                onClick={() => handleTestSelect(testName)}
-                className={`w-full text-left px-3 py-2 rounded-md transition-colors duration-200 text-sm ${
-                  selectedTest === testName
-                    ? 'bg-blue-50 dark:bg-gray-700 text-blue-700 dark:text-gray-200'
-                    : 'text-gray-600 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800'
-                }`}
+          {testButtons.map((testName) => {
+            const isPlaying = playingTests.has(testName);
+            
+            return (
+              <div
+                key={testName}
+                className="group relative"
               >
-                {editingTest === testName ? (
-                  <input
-                    type="text"
-                    value={editingValue}
-                    onChange={handleTestNameChange}
-                    onBlur={handleTestNameBlur}
-                    onKeyDown={handleTestNameKeyDown}
-                    className="bg-transparent border-none outline-none w-full min-w-0 text-inherit"
-                    autoFocus
-                  />
-                ) : (
-                  <span 
-                    onClick={(e) => handleTestNameClick(e, testName)}
-                    className="cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200"
-                    title="Click to edit name"
-                  >
-                    {testName}
-                  </span>
-                )}
-              </button>
-              
-              {/* Trash bin icon - appears on hover */}
-              <button
-                onClick={(e) => handleDeleteTest(e, testName)}
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-all duration-200 hover:scale-110 hover:text-red-500 dark:hover:text-red-400 text-gray-400 dark:text-gray-500 p-1 rounded"
-                title="Delete test"
-              >
-                <Trash2Icon size={14} />
-              </button>
-            </div>
-          ))}
+                <button
+                  onClick={() => handleTestSelect(testName)}
+                  className={`w-full text-left px-3 py-2 rounded-md transition-colors duration-200 text-sm relative ${
+                    selectedTest === testName
+                      ? 'bg-blue-50 dark:bg-gray-700 text-blue-700 dark:text-gray-200'
+                      : 'text-gray-600 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800'
+                  }`}
+                >
+                  {/* Test name and trash bin - left side */}
+                  <div className="flex items-center space-x-2 pr-20">
+                    {editingTest === testName ? (
+                      <div className="flex items-center space-x-2 flex-1">
+                        <input
+                          type="text"
+                          value={editingValue}
+                          onChange={handleTestNameChange}
+                          onBlur={handleTestNameBlur}
+                          onKeyDown={handleTestNameKeyDown}
+                          className="bg-transparent border-none outline-none min-w-0 text-inherit flex-1"
+                          autoFocus
+                        />
+                        
+                        {/* Trash bin icon - inline with text input */}
+                        <button
+                          onClick={(e) => handleDeleteTest(e, testName)}
+                          className="opacity-100 transition-all duration-200 hover:scale-110 hover:text-red-500 dark:hover:text-red-400 text-gray-400 dark:text-gray-500 p-1 rounded w-6 h-6 flex items-center justify-center flex-shrink-0"
+                          title="Delete test"
+                        >
+                          <Trash2Icon size={12} />
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <span 
+                          onClick={(e) => handleTestNameClick(e, testName)}
+                          className="cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200"
+                          title="Click to edit name"
+                        >
+                          {testName}
+                        </span>
+                        
+                        {/* Trash bin icon - inline with text */}
+                        <button
+                          onClick={(e) => handleDeleteTest(e, testName)}
+                          className="opacity-0 group-hover:opacity-100 transition-all duration-200 hover:scale-110 hover:text-red-500 dark:hover:text-red-400 text-gray-400 dark:text-gray-500 p-1 rounded w-6 h-6 flex items-center justify-center flex-shrink-0"
+                          title="Delete test"
+                        >
+                          <Trash2Icon size={12} />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  
+                  {/* Play/Pause and Stop buttons - absolutely positioned on the right */}
+                  <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center space-x-1">
+                    <button
+                      onClick={(e) => handlePlayPause(e, testName)}
+                      className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-200 text-gray-800 dark:text-gray-200 hover:scale-110"
+                      title={isPlaying ? "Pause" : "Play"}
+                    >
+                      {isPlaying ? (
+                        <PauseIcon size={12} className="fill-current" />
+                      ) : (
+                        <PlayIcon size={12} className="fill-current" />
+                      )}
+                    </button>
+                    
+                    <button
+                      onClick={(e) => handleStop(e, testName)}
+                      className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-200 text-gray-800 dark:text-gray-200 hover:scale-110"
+                      title="Stop"
+                    >
+                      <SquareIcon size={10} className="fill-current" />
+                    </button>
+                  </div>
+                </button>
+              </div>
+            );
+          })}
         </div>
         <div>
           <h2 className="text-sm font-medium mb-2">Chats</h2>
