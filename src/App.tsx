@@ -857,7 +857,8 @@ Please provide a detailed response about the CAD element shown in the image, add
             cursor: isDragging ? 'grabbing' : 'grab',
             backfaceVisibility: 'hidden',
             willChange: 'transform',
-            transformStyle: 'preserve-3d'
+            transformStyle: 'preserve-3d',
+            position: 'relative'  // Ensure position context
           }}
           onWheel={handleWheel}
           onMouseEnter={handleMouseEnter}
@@ -868,38 +869,50 @@ Please provide a detailed response about the CAD element shown in the image, add
           onDragOver={handleDragOver}
           onDrop={handleDrop}
         >
-          {/* 3D CAD Scene - Integrated into dotted canvas */}
-          {show3DScene && cadModel && (
-            <div className="absolute inset-0 z-10">
-              <canvas 
-                id="main-cad-canvas" 
-                className="w-full h-full"
-                style={{ 
-                  background: 'transparent',
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  zIndex: 10
-                }}
-              />
-            </div>
-          )}
-          {/* Infinite dotted grid background with zoom applied */}
+          {/* Canvas content wrapper - maintains stable coordinate system */}
           <div 
-            className="absolute bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] dark:bg-[radial-gradient(#4a5568_1px,transparent_1px)] origin-center transition-colors duration-200" 
+            className="absolute inset-0"
             style={{
-              backgroundSize: `${20 * zoom}px ${20 * zoom}px`,
-              transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
-              transformOrigin: 'center',
-              width: `${2000 / zoom}%`,
-              height: `${2000 / zoom}%`,
-              left: `${-1000 / zoom}%`,
-              top: `${-1000 / zoom}%`,
-              backfaceVisibility: 'hidden',
-              willChange: 'transform',
-              transformStyle: 'preserve-3d'
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              right: 0,
+              bottom: 0,
+              overflow: 'hidden'
             }}
-          />
+          >
+            {/* 3D CAD Scene - Integrated into dotted canvas */}
+            {show3DScene && cadModel && (
+              <div className="absolute inset-0 z-10">
+                <canvas 
+                  id="main-cad-canvas" 
+                  className="w-full h-full"
+                  style={{ 
+                    background: 'transparent',
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    zIndex: 10
+                  }}
+                />
+              </div>
+            )}
+            {/* Infinite dotted grid background with zoom applied */}
+            <div 
+              className="absolute bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] dark:bg-[radial-gradient(#4a5568_1px,transparent_1px)] origin-center transition-colors duration-200" 
+              style={{
+                backgroundSize: `${20 * zoom}px ${20 * zoom}px`,
+                transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
+                transformOrigin: 'center',
+                width: `${2000 / zoom}%`,
+                height: `${2000 / zoom}%`,
+                left: `${-1000 / zoom}%`,
+                top: `${-1000 / zoom}%`,
+                backfaceVisibility: 'hidden',
+                willChange: 'transform',
+                transformStyle: 'preserve-3d'
+              }}
+            />
           
           {/* Images on canvas */}
           {images.map(image => (
@@ -950,7 +963,7 @@ Please provide a detailed response about the CAD element shown in the image, add
                 top: `${modalPosition.y * zoom + pan.y}px`,
                 transform: `scale(${zoom})`,
                 transformOrigin: 'top left',
-                zIndex: 2000
+                zIndex: 2600 // Higher than the edge canvas
               }}
             >
               <DraggableModal
@@ -971,15 +984,20 @@ Please provide a detailed response about the CAD element shown in the image, add
             </div>
           )}
 
-          {/* Edges/Connections */}
-          <svg
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              width: '100%',
-              height: '100%',
-              zIndex: 2500
-            }}
-          >
+            {/* Edges/Connections - Fixed coordinate system */}
+            <svg
+              className="absolute pointer-events-none"
+              style={{
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                right: 0,
+                bottom: 0,
+                width: '100%',
+                height: '100%',
+                zIndex: 2500
+              }}
+            >
             {/* Render existing edges */}
             {edges.map(edge => {
               // Get the target image for silhouette color
@@ -1197,25 +1215,26 @@ Please provide a detailed response about the CAD element shown in the image, add
                 />
               </marker>
             </defs>
-          </svg>
-          {/* 3D CAD Viewer Overlay */}
-          {show3DScene && cadModel && cadModel.components && (
-            <div className="absolute inset-0 z-40 pointer-events-auto">
-              <CADViewer3D 
-                model={cadModel}
-                isDarkMode={isDarkMode}
-                onComponentClick={(component) => {
-                  console.log('Component clicked:', component);
-                }}
-              />
-              <button
-                onClick={() => setShow3DScene(false)}
-                className="absolute top-4 right-4 z-50 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg transition-colors"
-              >
-                Close 3D View
-              </button>
-            </div>
-          )}
+            </svg>
+            {/* 3D CAD Viewer Overlay */}
+            {show3DScene && cadModel && cadModel.components && (
+              <div className="absolute inset-0 z-40 pointer-events-auto">
+                <CADViewer3D 
+                  model={cadModel}
+                  isDarkMode={isDarkMode}
+                  onComponentClick={(component) => {
+                    console.log('Component clicked:', component);
+                  }}
+                />
+                <button
+                  onClick={() => setShow3DScene(false)}
+                  className="absolute top-4 right-4 z-50 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg transition-colors"
+                >
+                  Close 3D View
+                </button>
+              </div>
+            )}
+          </div>
         </main>
         {isChatOpen && (
           <RightSidebar 
