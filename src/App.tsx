@@ -198,6 +198,24 @@ export function App() {
     }
   }, [show3DScene, cadModel]);
 
+  // Update AI CAD wrapper position based on canvas pan and zoom
+  useEffect(() => {
+    const wrapper = (window as any).__aiCADWrapper as HTMLDivElement;
+    if (wrapper) {
+      // Position the wrapper like an image on the canvas
+      // Start at a fixed canvas position (e.g., center of viewport)
+      const canvasX = 100; // Fixed position in canvas coordinates
+      const canvasY = 100;
+      
+      // Apply the same transformation as images
+      wrapper.style.left = `${canvasX * zoom + pan.x}px`;
+      wrapper.style.top = `${canvasY * zoom + pan.y}px`;
+      wrapper.style.transform = `scale(${zoom})`;
+      wrapper.style.transformOrigin = 'top left';
+      wrapper.style.zIndex = '100'; // Same as images
+    }
+  }, [pan, zoom]);
+
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
   };
@@ -246,13 +264,20 @@ export function App() {
     
     // Handle both Three.js models and CADModel format from SLM generator
     if (model) {
+      // Check if this is an AI CAD Engine model (has physics/draggable properties)
+      if (model.hasPhysics || model.isDraggable || model.name === 'AI-Generated CAD Model') {
+        // This is from AICADEngine - don't show 3D view as it's already rendered on canvas
+        console.log('AI CAD Engine model detected, already rendered on canvas');
+        return; // Exit early, don't set show3DScene
+      }
+      
       if (model.components && !model.scene) {
         // This is a CADModel from SLM generator - display it using CADViewer3D
         console.log('SLM CAD model received, setting up for display...');
         setCadModel(model);
         setShow3DScene(true);
       } else if (model.scene && model.camera && model.renderer) {
-        // This is a valid Three.js model
+        // This is a valid Three.js model (but not from AICADEngine)
         console.log('Valid Three.js model received, displaying...');
         setCadModel(model);
         setShow3DScene(true);

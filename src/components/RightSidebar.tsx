@@ -32,6 +32,7 @@ import { MultiAgentCADSystem, ResearchPaperAnalysis, CADModel as MultiAgentCADMo
 import { OpenCASCADEService } from '../services/OpenCASCADEService';
 import { SLMHolographicGenerator } from '../services/SLMHolographicGenerator';
 import { NaturalLanguageCADService, CADSpecification } from '../services/NaturalLanguageCADService';
+import { AICADEngine } from '../services/AICADEngine';
 import * as THREE from 'three';
 
 interface RightSidebarProps {
@@ -96,6 +97,7 @@ export const RightSidebar = ({
   const [isSimulating, setIsSimulating] = useState(false);
   const [nlCADService] = useState(() => new NaturalLanguageCADService());
   const [currentCADSpec, setCurrentCADSpec] = useState<CADSpecification | null>(null);
+  const [aiCADEngine, setAICADEngine] = useState<AICADEngine | null>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -440,19 +442,32 @@ export const RightSidebar = ({
     // Check for Natural Language CAD commands first - much more flexible
     const lowerInput = inputValue.toLowerCase();
     
-    // Check for ball/sphere creation
-    const ballWords = ['ball', 'sphere', 'orb', 'globe'];
+    // Check for object creation
+    const objectWords = ['ball', 'sphere', 'orb', 'globe', 'box', 'cube', 'cylinder'];
     const createWords = ['make', 'create', 'generate', 'build', 'give', 'show', 'add', 'spawn', 'can you', 'could you', 'please'];
-    const bounceWords = ['bounce', 'bouncy', 'bouncing', 'jump', 'hop', 'hopping'];
     
-    const hasBallWord = ballWords.some(word => lowerInput.includes(word));
+    // Check for animations and actions
+    const animationWords = ['bounce', 'bouncy', 'bouncing', 'jump', 'hop', 'hopping', 'spin', 'rotate', 'turn', 'float', 'fly', 'hover'];
+    const colorWords = ['red', 'blue', 'green', 'yellow', 'orange', 'purple', 'pink', 'black', 'white', 'color', 'colour'];
+    const sizeWords = ['bigger', 'smaller', 'larger', 'tiny', 'huge', 'size', 'scale', 'grow', 'shrink'];
+    const actionWords = ['make', 'let', 'have', 'get', 'set', 'change', 'turn', 'transform'];
+    
+    const hasObjectWord = objectWords.some(word => lowerInput.includes(word));
     const hasCreateWord = createWords.some(word => lowerInput.includes(word));
-    const hasBounceWord = bounceWords.some(word => lowerInput.includes(word));
+    const hasAnimationWord = animationWords.some(word => lowerInput.includes(word));
+    const hasColorWord = colorWords.some(word => lowerInput.includes(word));
+    const hasSizeWord = sizeWords.some(word => lowerInput.includes(word));
+    const hasActionWord = actionWords.some(word => lowerInput.includes(word));
     
-    // Detect if it's a NL CAD command
-    const isNLCADCommand = (hasBallWord && hasCreateWord) || 
-                          (hasBallWord && lowerInput.includes('me a')) ||
-                          (hasBounceWord && (lowerInput.includes('ball') || lowerInput.includes('it') || lowerInput.includes('them')));
+    // Check if it refers to existing objects
+    const refersToExisting = lowerInput.includes('it') || lowerInput.includes('them') || lowerInput.includes('the ball') || lowerInput.includes('the sphere');
+    
+    // Detect if it's a NL CAD command - be more inclusive
+    const isNLCADCommand = (hasObjectWord && hasCreateWord) || 
+                          (hasObjectWord && lowerInput.includes('me a')) ||
+                          (hasAnimationWord && (refersToExisting || hasObjectWord)) ||
+                          (hasColorWord && (hasActionWord || refersToExisting)) ||
+                          (hasSizeWord && (hasActionWord || refersToExisting));
     
     if (isNLCADCommand) {
       const userMessage: Message = {
@@ -466,106 +481,126 @@ export const RightSidebar = ({
       setIsLoading(true);
 
       try {
-        // Parse the natural language input
-        const spec = nlCADService.parseNaturalLanguage(inputValue);
-        setCurrentCADSpec(spec);
+        const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+        if (!apiKey) {
+          throw new Error('API key not configured');
+        }
         
-        // Create a container for the 3D scene if needed
-        const container = document.createElement('div');
-        container.style.width = '100%';
-        container.style.height = '100%';
-        container.style.position = 'absolute';
-        container.style.top = '0';
-        container.style.left = '0';
+        // Create or get AICADEngine instance
+        let engine = aiCADEngine;
+        if (!engine) {
+          // Find the main canvas element to attach the 3D scene to
+          const mainCanvas = document.querySelector('main.canvas-zoom-area');
+          if (!mainCanvas) {
+            throw new Error('Main canvas not found');
+          }
+          
+          // Check if container already exists to prevent duplicates
+          let container = document.getElementById('ai-cad-engine-container') as HTMLDivElement;
+          
+          if (!container) {
+            // Create a wrapper div that will handle canvas transformations
+            const wrapper = document.createElement('div');
+            wrapper.style.position = 'absolute';
+            wrapper.style.width = '100%';  // Full width of canvas
+            wrapper.style.height = '100%'; // Full height of canvas
+            wrapper.style.top = '0';
+            wrapper.style.left = '0';
+            wrapper.id = 'ai-cad-engine-wrapper';
+            wrapper.className = 'ai-cad-wrapper';
+            wrapper.style.pointerEvents = 'none'; // Allow mouse events to pass through to canvas
+            wrapper.style.zIndex = '150'; // Higher than images (100) but lower than modals
+            
+            // Create the actual container for the 3D scene
+            container = document.createElement('div');
+            container.style.width = '100%';
+            container.style.height = '100%';
+            container.style.position = 'absolute';
+            container.style.top = '0';
+            container.style.left = '0';
+            container.style.pointerEvents = 'auto'; // Enable mouse events for the 3D scene
+            container.id = 'ai-cad-engine-container';
+            
+            // Add container to wrapper, wrapper to main canvas
+            wrapper.appendChild(container);
+            mainCanvas.appendChild(wrapper);
+            
+            // Store reference to wrapper for position updates
+            (window as any).__aiCADWrapper = wrapper;
+          } else {
+            // Container exists, get its wrapper
+            const wrapper = document.getElementById('ai-cad-engine-wrapper');
+            if (wrapper) {
+              (window as any).__aiCADWrapper = wrapper;
+            }
+          }
+          
+          // Close any existing 3D view first
+          const buttons = Array.from(document.querySelectorAll('button'));
+          const closeButton = buttons.find(btn => btn.textContent?.includes('Close 3D View'));
+          if (closeButton) {
+            console.log('Closing existing 3D view');
+            closeButton.click();
+          }
+          
+          // Remove any existing CAD viewer canvases
+          const existingCanvases = container.querySelectorAll('canvas');
+          existingCanvases.forEach(canvas => canvas.remove());
+          
+          // Dispose of old engine if it exists globally
+          const oldEngine = (window as any).__aiCADEngine;
+          if (oldEngine && oldEngine.dispose) {
+            console.log('Disposing old engine');
+            oldEngine.dispose();
+            delete (window as any).__aiCADEngine;
+          }
+          
+          // Clear the container completely
+          container.innerHTML = '';
+          
+          // Create new engine and attach to container
+          engine = new AICADEngine(apiKey, container);
+          setAICADEngine(engine);
+          
+          // Store globally to prevent duplicates
+          (window as any).__aiCADEngine = engine;
+          console.log('Created new AICADEngine instance');
+        } else {
+          // Engine already exists, just use it
+          console.log('Using existing AICADEngine instance');
+        }
         
-        // Execute the specification and create/animate the 3D scene
-        const scene = await nlCADService.executeSpecification(spec, container);
+        // Execute AI command
+        const explanation = await engine.executeAICommand(inputValue.trim());
         
         // Package the model for display
-        const nlCADModel = {
-          scene: nlCADService.getScene(),
-          camera: nlCADService.getCamera(),
-          renderer: nlCADService.getRenderer(),
-          name: 'Natural Language CAD Model',
-          components: spec.objects.map(obj => ({
+        const aiCADModel = {
+          scene: engine.getScene(),
+          camera: engine.getCamera(),
+          renderer: engine.getRenderer(),
+          name: 'AI-Generated CAD Model',
+          isDraggable: true, // Enable dragging
+          hasPhysics: true,  // Enable physics
+          components: Array.from(engine.getObjects().values()).map(obj => ({
             id: obj.id,
             name: obj.name,
-            type: obj.type,
+            type: 'generated',
             geometry: {
-              type: obj.type,
-              parameters: {
-                radius: obj.radius_m,
-                diameter: obj.diameter_m,
-                width: obj.width_m,
-                height: obj.height_m,
-                depth: obj.depth_m
-              },
-              position: obj.position || { x: 0, y: 0, z: 0 },
+              type: 'sphere', // Default
+              parameters: { radius: 0.1 },
+              position: { x: obj.mesh.position.x, y: obj.mesh.position.y, z: obj.mesh.position.z },
               rotation: { x: 0, y: 0, z: 0 },
               scale: { x: 1, y: 1, z: 1 }
             },
-            material: obj.material
+            material: 'default'
           }))
         };
         
         // Pass to parent component to display in canvas
-        onCADModelGenerated?.(nlCADModel);
+        onCADModelGenerated?.(aiCADModel);
         
-        // Generate response message with spec details
-        let responseContent = `✅ **CAD Specification Generated**\n\n`;
-        responseContent += `**Intent:** ${spec.intent}\n`;
-        responseContent += `**Explanation:** ${spec.explain}\n\n`;
-        
-        if (spec.objects.length > 0) {
-          responseContent += `**Objects Created:**\n`;
-          spec.objects.forEach(obj => {
-            responseContent += `• **${obj.name}** (${obj.type})\n`;
-            if (obj.diameter_m) responseContent += `  - Diameter: ${(obj.diameter_m * 100).toFixed(1)} cm\n`;
-            if (obj.radius_m) responseContent += `  - Radius: ${(obj.radius_m * 100).toFixed(1)} cm\n`;
-            responseContent += `  - Mass: ${obj.mass_kg.toFixed(3)} kg\n`;
-            responseContent += `  - Density: ${obj.density_kg_m3} kg/m³\n`;
-            if (obj.meta.assumptions.length > 0) {
-              responseContent += `  - Assumptions: ${obj.meta.assumptions.join(', ')}\n`;
-            }
-          });
-        }
-        
-        if (spec.actions.length > 0) {
-          responseContent += `\n**Actions Applied:**\n`;
-          spec.actions.forEach(action => {
-            if (action.type === 'set_restitution') {
-              responseContent += `• Set bounciness (restitution): ${action.value}\n`;
-            } else if (action.type === 'apply_impulse') {
-              responseContent += `• Applied impulse: ${action.impulse_Ns?.toFixed(2)} N·s upward\n`;
-            }
-          });
-        }
-        
-        if (spec.warnings.length > 0) {
-          responseContent += `\n⚠️ **Warnings:**\n`;
-          spec.warnings.forEach(warning => {
-            responseContent += `• ${warning}\n`;
-          });
-        }
-        
-        responseContent += `\n**Numeric Validation:**\n`;
-        if (spec.objects.length > 0) {
-          const obj = spec.objects[0];
-          if (obj.radius_m) {
-            const r = obj.radius_m;
-            const r3 = Math.pow(r, 3);
-            const volume = (4/3) * Math.PI * r3;
-            responseContent += `• r = ${r.toFixed(4)} m\n`;
-            responseContent += `• r³ = ${r3.toFixed(8)} m³\n`;
-            responseContent += `• V = (4/3) × π × r³ = ${volume.toFixed(8)} m³\n`;
-            responseContent += `• Mass = ρ × V = ${obj.density_kg_m3} × ${volume.toFixed(8)} = ${obj.mass_kg.toFixed(6)} kg\n`;
-          }
-        }
-        
-        responseContent += `\n**Next Steps:**\n`;
-        spec.next_steps_suggestion.forEach(step => {
-          responseContent += `• ${step}\n`;
-        });
+        // Generate response message
+        const responseContent = `✅ **AI CAD Model Generated!**\n\n**Explanation:** ${explanation}\n\n**Features:**\n• **Fully draggable objects** - Click and drag any object\n• **Real-time physics simulation** - Objects respond to gravity and collisions\n• **AI-powered animations** - Dynamic behavior based on your commands\n• **Interactive 3D environment** - Zoom, pan, and rotate the view\n\n**Instructions:**\n• **Click and drag** objects to move them around\n• **Try saying** "make it bounce" for continuous bouncing\n• **Ask for colors** like "make it red" or "change color to blue"\n• **Request animations** like "make it spin" or "make it float"\n\nThe model is now active in the canvas with full interactivity!`;
         
         const botMessage: Message = {
           id: Date.now() + 1,
@@ -576,11 +611,11 @@ export const RightSidebar = ({
         setMessages(prev => [...prev, botMessage]);
         
       } catch (error) {
-        console.error('Error processing NL CAD command:', error);
+        console.error('Error processing AI CAD command:', error);
         const errorMessage: Message = {
           id: Date.now() + 1,
           sender: 'bot',
-          content: `❌ Error processing CAD command: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          content: `❌ Error processing AI CAD command: ${error instanceof Error ? error.message : 'Unknown error'}\n\nPlease make sure your API key is configured and try again.`,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         };
         setMessages(prev => [...prev, errorMessage]);
