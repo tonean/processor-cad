@@ -1132,7 +1132,7 @@ Please provide a detailed response about the CAD element shown in the image, add
                   key={edge.id}
                   d={pathData}
                   stroke={strokeColor}
-                  strokeWidth="2"
+                  strokeWidth="0.5"
                   fill="none"
                   markerEnd={targetImage ? "url(#arrowhead)" : "url(#arrowhead-red)"}
                 />
