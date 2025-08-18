@@ -51,6 +51,7 @@ interface Message {
   sender: 'user' | 'bot';
   content: string;
   timestamp: string;
+  imageUrl?: string; // Optional image URL for AI CAD model previews
 }
 
 interface SelectedFile {
@@ -599,8 +600,59 @@ export const RightSidebar = ({
         // Pass to parent component to display in canvas
         onCADModelGenerated?.(aiCADModel);
         
+        // Debug: Check if container and canvas exist
+        console.log('Checking for container and canvas...');
+        const containerCheck = document.getElementById('ai-cad-engine-container');
+        const canvasCheck = containerCheck?.querySelector('canvas');
+        console.log('Container exists:', !!containerCheck);
+        console.log('Canvas exists:', !!canvasCheck);
+        if (canvasCheck) {
+          const canvas = canvasCheck as HTMLCanvasElement;
+          console.log('Canvas dimensions:', { width: canvas.width, height: canvas.height });
+        }
+        
+        // Take a screenshot of the AI CAD model for the chat
+        let imageUrl: string | undefined;
+        try {
+          // Wait for the next frame to ensure rendering is complete
+          requestAnimationFrame(() => {
+            setTimeout(() => {
+              const container = document.getElementById('ai-cad-engine-container');
+              if (container && container.querySelector('canvas')) {
+                const canvas = container.querySelector('canvas') as HTMLCanvasElement;
+                if (canvas && canvas.width > 0 && canvas.height > 0) {
+                  try {
+                    // Create a data URL from the canvas
+                    const screenshot = canvas.toDataURL('image/png', 0.8);
+                    console.log('Screenshot captured successfully, updating message...');
+                    
+                    // Update the message with the screenshot using the actual message ID
+                    setMessages(prev => {
+                      const lastMessage = prev[prev.length - 1];
+                      if (lastMessage && lastMessage.sender === 'bot') {
+                        return prev.map(msg => 
+                          msg.id === lastMessage.id ? { ...msg, imageUrl: screenshot } : msg
+                        );
+                      }
+                      return prev;
+                    });
+                  } catch (canvasError) {
+                    console.warn('Canvas toDataURL failed:', canvasError);
+                  }
+                } else {
+                  console.warn('Canvas not ready for screenshot:', { width: canvas?.width, height: canvas?.height });
+                }
+              } else {
+                console.warn('Container or canvas not found for screenshot');
+              }
+            }, 200); // Increased delay to ensure rendering
+          });
+        } catch (error) {
+          console.warn('Could not capture AI CAD model screenshot:', error);
+        }
+        
         // Generate response message
-        const responseContent = `✅ **AI CAD Model Generated!**\n\n**Explanation:** ${explanation}\n\n**Features:**\n• **Fully draggable objects** - Click and drag any object\n• **Real-time physics simulation** - Objects respond to gravity and collisions\n• **AI-powered animations** - Dynamic behavior based on your commands\n• **Interactive 3D environment** - Zoom, pan, and rotate the view\n\n**Instructions:**\n• **Click and drag** objects to move them around\n• **Try saying** "make it bounce" for continuous bouncing\n• **Ask for colors** like "make it red" or "change color to blue"\n• **Request animations** like "make it spin" or "make it float"\n\nThe model is now active in the canvas with full interactivity!`;
+        const responseContent = `AI CAD Model Generated!\n\n${explanation}`;
         
         const botMessage: Message = {
           id: Date.now() + 1,
@@ -1192,24 +1244,45 @@ User message: ${inputValue.trim() || `User sent ${selectedFiles.length} file${se
                       </p>
                       <div className="text-sm text-gray-800 dark:text-gray-200 leading-relaxed">
                         {message.sender === 'bot' ? (
-                          <ReactMarkdown 
-                            components={{
-                              p: ({children}) => <p className="mb-2 last:mb-0 text-sm text-gray-800 dark:text-gray-200">{children}</p>,
-                              strong: ({children}) => <strong className="font-semibold">{children}</strong>,
-                              em: ({children}) => <em className="italic">{children}</em>,
-                              code: ({children}) => <code className="bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded text-xs">{children}</code>,
-                              pre: ({children}) => <pre className="bg-gray-100 dark:bg-gray-700 p-2 rounded text-xs overflow-x-auto mb-2">{children}</pre>,
-                              ul: ({children}) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
-                              ol: ({children}) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
-                              li: ({children}) => <li className="text-sm">{children}</li>,
-                              h1: ({children}) => <h1 className="text-lg font-bold mb-2">{children}</h1>,
-                              h2: ({children}) => <h2 className="text-base font-bold mb-2">{children}</h2>,
-                              h3: ({children}) => <h3 className="text-sm font-bold mb-1">{children}</h3>,
-                              blockquote: ({children}) => <blockquote className="border-l-4 border-gray-300 dark:border-gray-600 pl-4 italic mb-2">{children}</blockquote>,
-                            }}
-                          >
-                            {message.content}
-                          </ReactMarkdown>
+                          <>
+                            <ReactMarkdown 
+                              components={{
+                                p: ({children}) => <p className="mb-2 last:mb-0 text-sm text-gray-800 dark:text-gray-200">{children}</p>,
+                                strong: ({children}) => <strong className="font-semibold">{children}</strong>,
+                                em: ({children}) => <em className="italic">{children}</em>,
+                                code: ({children}) => <code className="bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded text-xs">{children}</code>,
+                                pre: ({children}) => <pre className="bg-gray-100 dark:bg-gray-700 p-2 rounded text-xs overflow-x-auto mb-2">{children}</pre>,
+                                ul: ({children}) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
+                                ol: ({children}) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
+                                li: ({children}) => <li className="text-sm">{children}</li>,
+                                h1: ({children}) => <h1 className="text-lg font-bold mb-2">{children}</h1>,
+                                h2: ({children}) => <h2 className="text-base font-bold mb-2">{children}</h2>,
+                                h3: ({children}) => <h3 className="text-sm font-bold mb-1">{children}</h3>,
+                                blockquote: ({children}) => <blockquote className="border-l-4 border-gray-300 dark:border-gray-600 pl-4 italic mb-2">{children}</blockquote>,
+                              }}
+                            >
+                              {message.content}
+                            </ReactMarkdown>
+                            {/* AI CAD Model Preview Image */}
+                            {message.imageUrl && (
+                              <div className="mt-3 mb-2">
+                                <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-pink-200 dark:border-pink-400 overflow-hidden" style={{ maxWidth: '400px' }}>
+                                  <div className="bg-gray-100 dark:bg-gray-700 p-3 flex items-center space-x-2">
+                                    <div className="w-4 h-4 bg-gray-800 dark:bg-white rounded-sm flex items-center justify-center">
+                                      <div className="w-2 h-2 bg-white dark:bg-gray-800 rounded-sm"></div>
+                                    </div>
+                                    <span className="text-gray-800 dark:text-white text-xs font-medium">3D Object</span>
+                                  </div>
+                                  <img 
+                                    src={message.imageUrl} 
+                                    alt="AI CAD Model Preview" 
+                                    className="w-full h-auto object-contain bg-white dark:bg-gray-800"
+                                    style={{ minHeight: '200px' }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </>
                         ) : (
                           <p>{message.content}</p>
                         )}

@@ -370,7 +370,7 @@ export class AICADEngine {
     
     switch (params.type) {
       case 'sphere':
-        const radius = params.radius || 0.2;  // Slightly bigger default for better visibility
+        const radius = params.radius || 0.6;  // Much bigger default for better visibility in preview
         geometry = new THREE.SphereGeometry(radius, 64, 64);  // Higher segments for smoother sphere
         shape = new CANNON.Sphere(radius);
         break;
