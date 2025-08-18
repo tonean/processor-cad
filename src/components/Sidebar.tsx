@@ -6,13 +6,15 @@ interface SidebarProps {
   onResize?: (width: number) => void;
   onCollapse?: () => void;
   width?: number;
+  onObjectSelect?: (isSelected: boolean) => void;
 }
 
 export const Sidebar = ({
   isDarkMode,
   onResize,
   onCollapse,
-  width = 256
+  width = 256,
+  onObjectSelect
 }: SidebarProps) => {
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
@@ -22,6 +24,7 @@ export const Sidebar = ({
   const [editingTest, setEditingTest] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState('');
   const [playingTests, setPlayingTests] = useState<Set<string>>(new Set());
+  const [isObjectSelected, setIsObjectSelected] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -150,6 +153,11 @@ export const Sidebar = ({
     });
   };
 
+  const handleObjectSelect = (isSelected: boolean) => {
+    setIsObjectSelected(isSelected);
+    onObjectSelect?.(isSelected);
+  };
+
   useEffect(() => {
     if (isDragging) {
       document.addEventListener('mousemove', handleMouseMove);
@@ -275,8 +283,13 @@ export const Sidebar = ({
           })}
         </div>
         <div>
-          <h2 className="text-sm font-medium mb-2">Chats</h2>
-          {/* Chat items would go here */}
+          <h2 className="text-sm font-medium mb-2">Properties</h2>
+          {!isObjectSelected && (
+            <p className="text-xs text-gray-400 dark:text-gray-500 italic mt-4">
+              Click on an object to see its properties
+            </p>
+          )}
+          {/* Properties items would go here */}
         </div>
       </div>
       

@@ -869,6 +869,12 @@ Please provide a detailed response about the CAD element shown in the image, add
           onDragOver={handleDragOver}
           onDrop={handleDrop}
         >
+          {/* Top Left Toolbar */}
+          <div className="absolute top-4 left-4 z-50 bg-white/20 dark:bg-gray-900/20 backdrop-blur-sm dark:backdrop-blur-md rounded-lg border border-white/30 dark:border-gray-700/30 shadow-lg px-4 py-2 flex items-center space-x-3 text-sm font-medium text-gray-800 dark:text-gray-200">
+            <span>Simulation</span>
+            <div className="w-px h-4 bg-gray-400/50 dark:bg-gray-500/50"></div>
+            <span>Components</span>
+          </div>
           {/* Canvas content wrapper - maintains stable coordinate system */}
           <div 
             className="absolute inset-0"
