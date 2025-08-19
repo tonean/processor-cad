@@ -40,6 +40,9 @@ export function App() {
   const [cadModel, setCadModel] = useState<any>(null);
   const [show3DScene, setShow3DScene] = useState(false);
   
+  // Toolbar selection state
+  const [selectedToolbarOption, setSelectedToolbarOption] = useState<'simulation' | 'components'>('simulation');
+  
   // Edge/Connection state
   const [edges, setEdges] = useState<Array<{
     id: string;
@@ -869,11 +872,29 @@ Please provide a detailed response about the CAD element shown in the image, add
           onDragOver={handleDragOver}
           onDrop={handleDrop}
         >
-          {/* Top Left Toolbar */}
-          <div className="absolute top-4 left-4 z-50 bg-white/20 dark:bg-gray-900/20 backdrop-blur-sm dark:backdrop-blur-md rounded-lg border border-white/30 dark:border-gray-700/30 shadow-lg px-4 py-2 flex items-center space-x-3 text-sm font-medium text-gray-800 dark:text-gray-200">
-            <span>Simulation</span>
-            <div className="w-px h-4 bg-gray-400/50 dark:bg-gray-500/50"></div>
-            <span>Components</span>
+          {/* Top Middle Toolbar */}
+          <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 bg-white/20 dark:bg-gray-900/20 backdrop-blur-sm dark:backdrop-blur-md rounded-lg border border-white/30 dark:border-gray-700/30 shadow-lg px-3 py-1.5 flex items-center space-x-2 text-xs font-medium text-gray-800 dark:text-gray-200">
+            <button
+              onClick={() => setSelectedToolbarOption(selectedToolbarOption === 'simulation' ? null : 'simulation')}
+              className={`px-2 py-0.5 rounded transition-all duration-200 cursor-pointer ${
+                selectedToolbarOption === 'simulation'
+                  ? 'bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-400/30 shadow-inner'
+                  : 'text-gray-800 dark:text-gray-200 hover:bg-white/30 dark:hover:bg-gray-800/30 hover:text-blue-600 dark:hover:text-blue-400'
+              }`}
+            >
+              Simulation
+            </button>
+            <div className="w-px h-3 bg-gray-400/50 dark:bg-gray-500/50"></div>
+            <button
+              onClick={() => setSelectedToolbarOption(selectedToolbarOption === 'components' ? null : 'components')}
+              className={`px-2 py-0.5 rounded transition-all duration-200 cursor-pointer ${
+                selectedToolbarOption === 'components'
+                  ? 'bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-400/30 shadow-inner'
+                  : 'text-gray-800 dark:text-gray-200 hover:bg-white/30 dark:hover:bg-gray-800/30 hover:text-blue-600 dark:hover:text-blue-400'
+              }`}
+            >
+              Components
+            </button>
           </div>
           {/* Canvas content wrapper - maintains stable coordinate system */}
           <div 
